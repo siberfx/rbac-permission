@@ -1,0 +1,72 @@
+{
+    "name": "siberfx/rbac-permission",
+    "description": "Scope-aware roles and permissions for Laravel: module.resource.verb@scope grants, a scope ladder, query constraints, and HTTP, console, Gate and Blade enforcement with an explainable decision trace.",
+    "keywords": [
+        "siberfx",
+        "laravel",
+        "rbac",
+        "permissions",
+        "roles",
+        "scopes",
+        "authorization",
+        "acl",
+        "policies"
+    ],
+    "homepage": "https://github.com/siberfx/rbac-permission",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Selim Gormus",
+            "email": "info@siberfx.com",
+            "role": "Lead Software Engineer"
+        }
+    ],
+    "require": {
+        "php": "^8.4",
+        "illuminate/auth": "^12.0 || ^13.0",
+        "illuminate/cache": "^12.0 || ^13.0",
+        "illuminate/console": "^12.0 || ^13.0",
+        "illuminate/contracts": "^12.0 || ^13.0",
+        "illuminate/database": "^12.0 || ^13.0",
+        "illuminate/events": "^12.0 || ^13.0",
+        "illuminate/http": "^12.0 || ^13.0",
+        "illuminate/routing": "^12.0 || ^13.0",
+        "illuminate/support": "^12.0 || ^13.0",
+        "illuminate/view": "^12.0 || ^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^10.0 || ^11.0",
+        "pestphp/pest": "^3.8 || ^4.0",
+        "pestphp/pest-plugin-laravel": "^3.2 || ^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Siberfx\\RbacPermission\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Siberfx\\RbacPermission\\Tests\\": "tests"
+        }
+    },
+    "scripts": {
+        "test": "pest"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Siberfx\\RbacPermission\\RbacPermissionServiceProvider"
+            ],
+            "aliases": {
+                "Rbac": "Siberfx\\RbacPermission\\Facades\\Rbac"
+            }
+        }
+    },
+    "minimum-stability": "stable"
+}
