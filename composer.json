@@ -35,9 +35,13 @@
         "illuminate/view": "^12.0 || ^13.0"
     },
     "require-dev": {
+        "filament/filament": "^5.8.3",
         "orchestra/testbench": "^10.0 || ^11.0",
         "pestphp/pest": "^3.8 || ^4.0",
         "pestphp/pest-plugin-laravel": "^3.2 || ^4.0"
+    },
+    "suggest": {
+        "filament/filament": "Adds the RBAC role screens and the user roles relation manager for Filament panels (^5.8.3)."
     },
     "autoload": {
         "psr-4": {

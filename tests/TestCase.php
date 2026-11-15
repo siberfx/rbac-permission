@@ -20,7 +20,11 @@ abstract class TestCase extends Orchestra
 
     protected function getPackageProviders($app): array
     {
-        return [RbacPermissionServiceProvider::class];
+        return [
+            RbacPermissionServiceProvider::class,
+            \Livewire\LivewireServiceProvider::class,
+            \Filament\FilamentServiceProvider::class,
+        ];
     }
 
     protected function defineEnvironment($app): void

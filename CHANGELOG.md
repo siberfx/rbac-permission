@@ -4,6 +4,20 @@ All notable changes to `siberfx/rbac-permission` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.6.0] - 2026-11-16
+
+### Added
+
+- Filament 5 integration. `Siberfx\RbacPermission\Filament\RbacPlugin` adds a Roles resource to a panel. Filament is optional (`suggest`) and is required only when you use the plugin.
+- Roles resource: lists the roles of every guard and edits name, description and rank. Editing is limited to roles below the signed-in user's rank, and a rank cannot be set at or above their own.
+- Grants relation manager on each role: add and remove grants, each checked with `Rbac::canGrant()`.
+- `UserRolesRelationManager` for your user resource: shows a user's roles and expiry, and assigns or removes them under the rank rules.
+- `Siberfx\RbacPermission\Filament\Support\Operations`: the write operations behind the screens, so they can be used and tested without the UI.
+
+### Upgrading
+
+- No migration. Install Filament 5.8.3 or later to use the plugin.
+
 ## [1.5.0] - 2026-11-16
 
 ### Added

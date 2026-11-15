@@ -77,12 +77,14 @@ A quick look against [spatie/laravel-permission](https://github.com/spatie/larav
 | Role hierarchy | Not built in | Ranks: actors can only manage roles below their own rank |
 | Time-limited access | Not built in | Built in: `expires_at` on roles and direct grants |
 | Audit | Not built in | Events, with an optional audit table |
-| Multiple guards | Supported | Not supported. Checks use the default guard only |
+| Multiple guards | Supported | Supported: roles belong to a guard, and a user model picks its guard |
+| Admin screens | Not built in. Available through third-party panels | Built in: Blade role and assignment screens (optional, off by default) |
+| Filament integration | Not built in. Available through third-party plugins | Optional `RbacPlugin` for Filament 5: role screens, grant editor, user roles relation manager |
 | Ecosystem | Large user base, many third-party integrations, years of production use | New (v1.x), small user base, few integrations |
 
-**Choose Spatie** for a standard, well-supported permission system with flat rules and a large ecosystem, or when you need multiple guards.
+**Choose Spatie** for a standard, well-supported permission system with flat rules and a large ecosystem, or when you need to use it with a wide range of third-party packages.
 
-**Choose RBAC Permission** when access depends on which records a user may reach, when lists must be filtered by team or tenant, when you need to explain decisions, or when you want hierarchy, expiry and an audit trail built in.
+**Choose RBAC Permission** when access depends on which records a user may reach, when lists must be filtered by team or tenant, when you need to explain decisions, when you want hierarchy, expiry and an audit trail built in, or when you need admin screens for roles and assignments.
 
 *Spatie's feature list reflects its documentation at the time of writing. Check its current docs before deciding.*
 
@@ -349,6 +351,52 @@ Every action checks a catalog permission:
 A role editor can only add a grant they already hold at that scope or wider, enforced by `Rbac::canGrant()`. Role assignment follows the rank rules, so an admin cannot hand out a role at their own rank or higher.
 
 The screens are plain Blade with no CDN assets, and they follow light and dark mode. They are a starting point. To change the look, publish the views with `php artisan vendor:publish --tag=rbac-views`. They are then loaded from `resources/views/vendor/rbac`.
+
+If your admin is built on Filament, use the Filament integration below instead.
+
+## 🧩 Filament integration
+
+For Filament 5 panels. Install Filament, then add the plugin to a panel:
+
+```bash
+composer require filament/filament:^5.8.3
+```
+
+```php
+use Siberfx\RbacPermission\Filament\RbacPlugin;
+
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        ->default()
+        ->id('admin')
+        ->path('admin')
+        ->plugin(RbacPlugin::make());   // adds the Roles resource
+}
+```
+
+To show a user's roles and assign them from your user resource, add the relation manager:
+
+```php
+use Siberfx\RbacPermission\Filament\Resources\UserRolesRelationManager;
+
+public static function getRelations(): array
+{
+    return [UserRolesRelationManager::class];   // the user model must use HasRbac
+}
+```
+
+What the screens do:
+
+- **Roles** lists every role of every guard. Editing a role changes its name, description and rank. Role slugs and grants come from `config/rbac.php` through `rbac:sync`, and the screen manages grants in a relation manager.
+- **Grants** can be added and removed. The signed-in user must hold each grant at that scope or wider (`Rbac::canGrant()`), so a role editor cannot hand out access they lack.
+- **Ranks** cannot be set at or above your own rank, and you can only edit roles below your rank.
+- **Assignments** follow the same rank rules. Expiry is optional.
+- The Roles resource does not offer create or delete. Create roles in `config/rbac.php` and run `rbac:sync`.
+
+Access uses the catalog permissions from the admin screens (`admin.role.show`, `admin.role.edit`, `admin.user.show`, `admin.user.edit`). The Roles resource is hidden from users who do not hold them.
+
+`RbacPlugin` and the relation manager use the signed-in user from Filament's guard (`Filament::auth()`).
 
 ---
 
