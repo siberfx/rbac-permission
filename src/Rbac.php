@@ -4,7 +4,9 @@ namespace Siberfx\RbacPermission;
 
 use Illuminate\Contracts\Cache\Factory as CacheFactory;
 use Illuminate\Database\Eloquent\Builder;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -261,10 +263,10 @@ final class Rbac
      */
     public function rankOf(Model $user): ?int
     {
-        $rank = $user->getConnection()->table($this->table('role_assignments').' as a')
+        $rank = $this->whereActive($user->getConnection()->table($this->table('role_assignments').' as a')
             ->join($this->table('roles').' as r', 'r.id', '=', 'a.role_id')
             ->where('a.model_type', $user->getMorphClass())
-            ->where('a.model_id', (string) $user->getKey())
+            ->where('a.model_id', (string) $user->getKey()), 'a.expires_at')
             ->max('r.rank');
 
         return $rank === null ? null : (int) $rank;
@@ -321,14 +323,15 @@ final class Rbac
      * role must sit strictly below the actor's rank. Without $by nothing is checked,
      * which is how seeders and trusted commands run.
      */
-    public function assign(Model $user, Role|string $role, ?Model $by = null): void
+    public function assign(Model $user, Role|string $role, ?Model $by = null, ?DateTimeInterface $expiresAt = null): void
     {
         $role = $role instanceof Role ? $role : $this->findRole($role);
         $this->assertCanManage($by, $role);
 
+        // Re-assigning replaces the expiry: no date makes the role permanent again.
         $user->getConnection()->table($this->table('role_assignments'))->updateOrInsert(
             ['role_id' => $role->getKey(), 'model_type' => $user->getMorphClass(), 'model_id' => (string) $user->getKey()],
-            ['created_at' => now(), 'updated_at' => now()],
+            ['expires_at' => $expiresAt, 'created_at' => now(), 'updated_at' => now()],
         );
 
         $this->flush();
@@ -350,14 +353,38 @@ final class Rbac
         return $deleted;
     }
 
-    public function allow(Model $user, string $permission): UserGrant
+    /**
+     * Direct allow. Pass $expiresAt for a time-boxed grant; it stops applying once that moment passes.
+     */
+    public function allow(Model $user, string $permission, ?DateTimeInterface $expiresAt = null): UserGrant
     {
-        return $this->directGrant($user, $permission, Grant::ALLOW);
+        return $this->directGrant($user, $permission, Grant::ALLOW, $expiresAt);
     }
 
-    public function deny(Model $user, string $permission): UserGrant
+    /**
+     * Direct deny. Pass $expiresAt to lift the deny automatically.
+     */
+    public function deny(Model $user, string $permission, ?DateTimeInterface $expiresAt = null): UserGrant
     {
-        return $this->directGrant($user, $permission, Grant::DENY);
+        return $this->directGrant($user, $permission, Grant::DENY, $expiresAt);
+    }
+
+    /**
+     * Delete role assignments and direct grants whose expiry has passed. Returns the number removed.
+     */
+    public function pruneExpired(): int
+    {
+        $connection = DB::connection();
+
+        $assignments = $connection->table($this->table('role_assignments'))
+            ->whereNotNull('expires_at')->where('expires_at', '<=', now())->delete();
+
+        $grants = $connection->table($this->table('user_grants'))
+            ->whereNotNull('expires_at')->where('expires_at', '<=', now())->delete();
+
+        $this->flush();
+
+        return $assignments + $grants;
     }
 
     /**
@@ -572,16 +599,16 @@ final class Rbac
         $morph = $user->getMorphClass();
         $id = (string) $user->getKey();
 
-        $fromRoles = $connection->table($this->table('role_assignments').' as a')
+        $fromRoles = $this->whereActive($connection->table($this->table('role_assignments').' as a')
             ->join($this->table('roles').' as r', 'r.id', '=', 'a.role_id')
             ->join($this->table('role_grants').' as g', 'g.role_id', '=', 'a.role_id')
             ->where('a.model_type', $morph)
-            ->where('a.model_id', $id)
+            ->where('a.model_id', $id), 'a.expires_at')
             ->get(['r.slug as role', 'g.permission', 'g.scope']);
 
-        $direct = $connection->table($this->table('user_grants'))
+        $direct = $this->whereActive($connection->table($this->table('user_grants'))
             ->where('model_type', $morph)
-            ->where('model_id', $id)
+            ->where('model_id', $id), 'expires_at')
             ->get(['permission', 'scope', 'effect']);
 
         $grants = [];
@@ -597,17 +624,17 @@ final class Rbac
         return $grants;
     }
 
-    private function directGrant(Model $user, string $input, string $effect): UserGrant
+    private function directGrant(Model $user, string $input, string $effect, ?DateTimeInterface $expiresAt = null): UserGrant
     {
         [$pattern, $scope] = $this->parseGrant($input);
 
-        $grant = UserGrant::query()->firstOrCreate([
+        $grant = UserGrant::query()->updateOrCreate([
             'model_type' => $user->getMorphClass(),
             'model_id' => (string) $user->getKey(),
             'permission' => $pattern,
             'scope' => $scope,
             'effect' => $effect,
-        ]);
+        ], ['expires_at' => $expiresAt]);
 
         $this->flush();
 
@@ -625,6 +652,14 @@ final class Rbac
         $this->catalog->assertGrantable($pattern);
 
         return [$pattern, $scope];
+    }
+
+    /**
+     * Keep rows that have no expiry or whose expiry is still in the future.
+     */
+    private function whereActive(Builder|QueryBuilder $query, string $column): Builder|QueryBuilder
+    {
+        return $query->where(fn ($q) => $q->whereNull($column)->orWhere($column, '>', now()));
     }
 
     private function assertCanManage(?Model $actor, Role $role): void

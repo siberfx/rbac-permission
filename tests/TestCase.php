@@ -60,6 +60,7 @@ abstract class TestCase extends Orchestra
 
         (require __DIR__.'/../database/migrations/create_rbac_tables.php')->up();
         (require __DIR__.'/../database/migrations/add_rank_to_rbac_roles.php')->up();
+        (require __DIR__.'/../database/migrations/add_expires_at_to_rbac_grants.php')->up();
     }
 
     protected function defineRoutes($router): void

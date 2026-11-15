@@ -303,7 +303,7 @@ The exit code is `0` when allowed and `1` when denied, so it works in scripts an
 | `rbac:sync [--prune]` | Writes the roles from `config/rbac.php` to the database in one transaction. `--prune` removes roles that are no longer defined. |
 | `rbac:matrix [--only-granted]` | Prints the role by permission grid, showing the widest scope of each grant. |
 | `rbac:explain {permission} {user} [--on-model= --on=]` | Explains a decision, with the grants that were considered. |
-| `rbac:assign {role} {user} [--revoke]` | Gives or removes a role for a user. |
+| `rbac:assign {role} {user} [--revoke] [--expires=]` | Gives or removes a role for a user. `--expires` makes the role time-boxed. |
 | `rbac:grant {role} {permission} [--revoke]` | Adds or removes a grant on a role. The role is created if it is missing. |
 
 ```bash
@@ -360,6 +360,26 @@ Rbac::rankOf($admin);                           // 80
 ```
 
 Without `by:` nothing is checked, which is how seeders and trusted jobs run. `rbac:assign` checks against the configured console actor (`rbac.console`).
+
+### Time-boxed grants
+
+Roles and direct overrides accept an optional expiry. Once it passes, the grant stops applying, with no job needed.
+
+```php
+$user->assignRole('manager', expiresAt: now()->addDays(30));  // covering for a colleague
+$user->allowPermission('billing.refund.approve@global', now()->addHours(4));
+$user->denyPermission('billing.invoice.delete@own', now()->addDay());  // temporary lock-out
+
+Rbac::pruneExpired();  // optional: delete expired rows, e.g. from a daily schedule
+```
+
+```bash
+php artisan rbac:assign staff 42 --expires="+7 days"
+```
+
+Expired rows are ignored at once, even if they are still in the table. Assigning a role again without an expiry makes it permanent.
+
+When the grant cache is enabled (`rbac.cache.ttl > 0`), a grant can keep applying for up to `ttl` seconds after it expires. Keep the TTL short if that matters to you.
 
 ---
 
@@ -434,8 +454,8 @@ php artisan vendor:publish --tag=rbac-config
 | --- | --- |
 | `rbac_roles` | Role slug, name, description and rank |
 | `rbac_role_grants` | The permission and scope each role carries |
-| `rbac_role_assignments` | Which user holds which role (polymorphic) |
-| `rbac_user_grants` | Direct allows and denies on a user (polymorphic) |
+| `rbac_role_assignments` | Which user holds which role, and until when (polymorphic) |
+| `rbac_user_grants` | Direct allows and denies on a user, and until when (polymorphic) |
 
 Model ids are stored as strings, so integer, UUID and ULID keys all work.
 
@@ -469,7 +489,7 @@ Rbac::flush();
 ## 🗺️ Roadmap
 
 - [x] Role hierarchy with "can only assign roles below mine" (v1.1.0)
-- [ ] Time-boxed grants (`expires_at`)
+- [x] Time-boxed grants (`expires_at`) (v1.2.0)
 - [ ] Permission audit log through the event system
 
 Ideas and pull requests are welcome.

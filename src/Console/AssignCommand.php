@@ -3,6 +3,7 @@
 namespace Siberfx\RbacPermission\Console;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
 use Siberfx\RbacPermission\Exceptions\RoleAssignmentDenied;
 use Siberfx\RbacPermission\Rbac;
 
@@ -12,7 +13,8 @@ class AssignCommand extends Command
         {role : Role slug}
         {user : User id}
         {--model= : User model class (defaults to the auth users model)}
-        {--revoke : Remove the role instead of assigning it}';
+        {--revoke : Remove the role instead of assigning it}
+        {--expires= : When the role stops applying, e.g. "+30 days" or "2027-01-31"}';
 
     protected $description = 'Assign or revoke a role for a user';
 
@@ -38,7 +40,9 @@ class AssignCommand extends Command
                 return self::SUCCESS;
             }
 
-            $rbac->assign($user, $this->argument('role'), $actor);
+            $expires = $this->option('expires') ? Carbon::parse($this->option('expires')) : null;
+
+            $rbac->assign($user, $this->argument('role'), $actor, $expires);
         } catch (RoleAssignmentDenied $e) {
             $this->error($e->getMessage());
 
