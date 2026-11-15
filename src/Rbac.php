@@ -247,27 +247,30 @@ final class Rbac
      | Management: roles, role grants, assignments, direct overrides
      | ------------------------------------------------------------------ */
 
-    public function role(string $slug, ?string $name = null, ?string $description = null, ?int $rank = null): Role
+    public function role(string $slug, ?string $name = null, ?string $description = null, ?int $rank = null, ?string $guard = null): Role
     {
         if (! preg_match('/^[a-z][a-z0-9_-]*$/', $slug)) {
             throw new InvalidArgumentException("Invalid role slug [{$slug}].");
         }
 
+        $guard ??= $this->defaultGuard();
+
         return Role::query()->firstOrCreate(
-            ['slug' => $slug],
+            ['slug' => $slug, 'guard' => $guard],
             ['name' => $name ?? Str::headline($slug), 'description' => $description, 'rank' => $rank ?? 0],
         );
     }
 
     /**
-     * The highest rank among the roles the user holds, or null when they hold none.
+     * The highest rank among the roles the user holds in their guard, or null when they hold none.
      */
     public function rankOf(Model $user): ?int
     {
         $rank = $this->whereActive($user->getConnection()->table($this->table('role_assignments').' as a')
             ->join($this->table('roles').' as r', 'r.id', '=', 'a.role_id')
             ->where('a.model_type', $user->getMorphClass())
-            ->where('a.model_id', (string) $user->getKey()), 'a.expires_at')
+            ->where('a.model_id', (string) $user->getKey())
+            ->where('r.guard', $this->guardFor($user)), 'a.expires_at')
             ->max('r.rank');
 
         return $rank === null ? null : (int) $rank;
@@ -275,10 +278,11 @@ final class Rbac
 
     /**
      * May this actor assign or remove the role? Only roles strictly below their own rank.
+     * A string role is looked up in the actor's guard; pass a Role to check across guards.
      */
     public function canAssign(Model $actor, Role|string $role): bool
     {
-        $role = $role instanceof Role ? $role : $this->findRole($role);
+        $role = $role instanceof Role ? $role : $this->findRole($role, $this->guardFor($actor));
         $rank = $this->rankOf($actor);
 
         return $rank !== null && $rank > (int) $role->rank;
@@ -287,10 +291,10 @@ final class Rbac
     /**
      * Add a grant to a role. Creates the role if it does not exist yet.
      */
-    public function grant(Role|string $role, string $permission): RoleGrant
+    public function grant(Role|string $role, string $permission, ?string $guard = null): RoleGrant
     {
         [$pattern, $scope] = $this->parseGrant($permission);
-        $role = $role instanceof Role ? $role : $this->role($role);
+        $role = $role instanceof Role ? $role : $this->role($role, guard: $guard);
 
         $grant = RoleGrant::query()->firstOrCreate([
             'role_id' => $role->getKey(),
@@ -307,10 +311,10 @@ final class Rbac
         return $grant;
     }
 
-    public function revoke(Role|string $role, string $permission): int
+    public function revoke(Role|string $role, string $permission, ?string $guard = null): int
     {
         [$pattern, $scope] = $this->parseGrant($permission);
-        $role = $role instanceof Role ? $role : $this->findRole($role);
+        $role = $role instanceof Role ? $role : $this->findRole($role, $guard);
 
         $deleted = RoleGrant::query()
             ->where('role_id', $role->getKey())
@@ -334,7 +338,7 @@ final class Rbac
      */
     public function assign(Model $user, Role|string $role, ?Model $by = null, ?DateTimeInterface $expiresAt = null): void
     {
-        $role = $role instanceof Role ? $role : $this->findRole($role);
+        $role = $role instanceof Role ? $role : $this->findRole($role, $this->guardFor($user));
         $this->assertCanManage($by, $role);
 
         // Re-assigning replaces the expiry: no date makes the role permanent again.
@@ -350,7 +354,7 @@ final class Rbac
 
     public function unassign(Model $user, Role|string $role, ?Model $by = null): int
     {
-        $role = $role instanceof Role ? $role : $this->findRole($role);
+        $role = $role instanceof Role ? $role : $this->findRole($role, $this->guardFor($user));
         $this->assertCanManage($by, $role);
 
         $deleted = $user->getConnection()->table($this->table('role_assignments'))
@@ -436,21 +440,23 @@ final class Rbac
      * @param  array<string, list<string>>  $definitions
      * @return array{roles: int, grants: int, pruned: int}
      */
-    public function sync(array $definitions, bool $prune = false): array
+    public function sync(array $definitions, bool $prune = false, ?string $guard = null): array
     {
+        $guard ??= $this->defaultGuard();
+
         $parsed = [];
 
         foreach ($definitions as $slug => $specs) {
             $parsed[(string) $slug] = array_map(fn ($spec) => $this->parseGrant((string) $spec), (array) $specs);
         }
 
-        return DB::transaction(function () use ($parsed, $prune) {
+        return DB::transaction(function () use ($parsed, $prune, $guard) {
             $stats = ['roles' => 0, 'grants' => 0, 'pruned' => 0];
 
-            $ranks = (array) config('rbac.ranks', []);
+            $ranks = (array) $this->guardSetting($guard, 'ranks');
 
             foreach ($parsed as $slug => $grants) {
-                $role = $this->role($slug);
+                $role = $this->role($slug, guard: $guard);
 
                 if (array_key_exists($slug, $ranks)) {
                     $role->update(['rank' => (int) $ranks[$slug]]);
@@ -471,7 +477,7 @@ final class Rbac
             }
 
             if ($prune) {
-                foreach (Role::query()->whereNotIn('slug', array_keys($parsed))->get() as $role) {
+                foreach (Role::query()->where('guard', $guard)->whereNotIn('slug', array_keys($parsed))->get() as $role) {
                     RoleGrant::query()->where('role_id', $role->getKey())->delete();
                     DB::table($this->table('role_assignments'))->where('role_id', $role->getKey())->delete();
                     $role->delete();
@@ -492,9 +498,10 @@ final class Rbac
      *
      * @return array{roles: list<string>, rows: array<string, array<string, ?string>>}
      */
-    public function matrix(): array
+    public function matrix(?string $guard = null): array
     {
-        $roles = Role::query()->with('grants')->orderBy('slug')->get();
+        $guard ??= $this->defaultGuard();
+        $roles = Role::query()->where('guard', $guard)->with('grants')->orderBy('slug')->get();
         $rows = [];
 
         foreach ($this->catalog->permissions() as $key) {
@@ -628,7 +635,8 @@ final class Rbac
             ->join($this->table('roles').' as r', 'r.id', '=', 'a.role_id')
             ->join($this->table('role_grants').' as g', 'g.role_id', '=', 'a.role_id')
             ->where('a.model_type', $morph)
-            ->where('a.model_id', $id), 'a.expires_at')
+            ->where('a.model_id', $id)
+            ->where('r.guard', $this->guardFor($user)), 'a.expires_at')
             ->get(['r.slug as role', 'g.permission', 'g.scope']);
 
         $direct = $this->whereActive($connection->table($this->table('user_grants'))
@@ -702,10 +710,36 @@ final class Rbac
         throw new RoleAssignmentDenied($role->slug, $this->rankOf($actor));
     }
 
-    private function findRole(string $slug): Role
+    private function findRole(string $slug, ?string $guard = null): Role
     {
-        return Role::query()->where('slug', $slug)->first()
-            ?? throw new InvalidArgumentException("Role [{$slug}] does not exist. Create it with Rbac::role() or rbac:sync.");
+        $guard ??= $this->defaultGuard();
+
+        return Role::query()->where('slug', $slug)->where('guard', $guard)->first()
+            ?? throw new InvalidArgumentException("Role [{$slug}] does not exist for guard [{$guard}]. Create it with Rbac::role() or rbac:sync.");
+    }
+
+    /**
+     * The guard a user model authenticates with. Models that define rbacGuard() (the HasRbac trait does) choose their own.
+     */
+    private function guardFor(Model $user): string
+    {
+        return method_exists($user, 'rbacGuard') ? (string) $user->rbacGuard() : $this->defaultGuard();
+    }
+
+    private function defaultGuard(): string
+    {
+        return (string) config('auth.defaults.guard', 'web');
+    }
+
+    /**
+     * A setting for a guard. The default guard reads the top-level key (roles, ranks);
+     * other guards read rbac.guards.{guard}.{key}.
+     */
+    private function guardSetting(string $guard, string $key): array
+    {
+        return $guard === $this->defaultGuard()
+            ? (array) config("rbac.{$key}", [])
+            : (array) config("rbac.guards.{$guard}.{$key}", []);
     }
 
     private function assertKnown(string $permission): void
@@ -736,9 +770,16 @@ final class Rbac
 
     private function currentUser(): ?Model
     {
-        $user = auth()->user();
+        // The default guard first, then every guard named in rbac.guards.
+        foreach (array_unique([$this->defaultGuard(), ...array_keys((array) config('rbac.guards', []))]) as $guard) {
+            $user = auth($guard)->user();
 
-        return $user instanceof Model ? $user : null;
+            if ($user instanceof Model) {
+                return $user;
+            }
+        }
+
+        return null;
     }
 
     private function memoKey(Model $user): string

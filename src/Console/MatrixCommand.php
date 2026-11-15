@@ -7,13 +7,15 @@ use Siberfx\RbacPermission\Rbac;
 
 class MatrixCommand extends Command
 {
-    protected $signature = 'rbac:matrix {--only-granted : Hide permissions that no role holds}';
+    protected $signature = 'rbac:matrix
+        {--only-granted : Hide permissions that no role holds}
+        {--guard= : Guard whose roles to show (defaults to the default guard)}';
 
     protected $description = 'Print the role by permission matrix with the widest scope of each grant';
 
     public function handle(Rbac $rbac): int
     {
-        $matrix = $rbac->matrix();
+        $matrix = $rbac->matrix($this->option('guard') ?: null);
 
         if ($matrix['roles'] === []) {
             $this->warn('No roles found. Run php artisan rbac:sync first.');

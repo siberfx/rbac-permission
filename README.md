@@ -328,11 +328,11 @@ The exit code is `0` when allowed and `1` when denied, so it works in scripts an
 
 | Command | What it does |
 | --- | --- |
-| `rbac:sync [--prune]` | Writes the roles from `config/rbac.php` to the database in one transaction. `--prune` removes roles that are no longer defined. |
-| `rbac:matrix [--only-granted]` | Prints the role by permission grid, showing the widest scope of each grant. |
+| `rbac:sync [--prune] [--guard=]` | Writes the roles from `config/rbac.php` to the database in one transaction, for every guard (or only `--guard`). `--prune` removes roles that are no longer defined. |
+| `rbac:matrix [--only-granted] [--guard=]` | Prints the role by permission grid for one guard, showing the widest scope of each grant. |
 | `rbac:explain {permission} {user} [--on-model= --on=]` | Explains a decision, with the grants that were considered. |
 | `rbac:assign {role} {user} [--revoke] [--expires=]` | Gives or removes a role for a user. `--expires` makes the role time-boxed. |
-| `rbac:grant {role} {permission} [--revoke]` | Adds or removes a grant on a role. The role is created if it is missing. |
+| `rbac:grant {role} {permission} [--revoke] [--guard=]` | Adds or removes a grant on a role. The role is created if it is missing. |
 
 ```bash
 php artisan rbac:matrix
@@ -388,6 +388,37 @@ Rbac::rankOf($admin);                           // 80
 ```
 
 Without `by:` nothing is checked, which is how seeders and trusted jobs run. `rbac:assign` checks against the configured console actor (`rbac.console`).
+
+### Multiple guards
+
+Roles belong to an authentication guard. Each user model says which guard it uses, and roles are resolved within it. So `manager` can mean one thing for `web` users and another for `admin` users.
+
+```php
+// config/rbac.php: the default guard uses the top-level roles and ranks
+'guards' => [
+    'admin' => [
+        'roles' => ['manager' => ['billing.*@tenant']],
+        'ranks' => ['manager' => 50],
+    ],
+],
+```
+
+```php
+class Admin extends Authenticatable
+{
+    use HasRbac;
+
+    public function rbacGuard(): string
+    {
+        return 'admin';  // HasRbac defaults to auth.defaults.guard
+    }
+}
+
+$admin->assignRole('manager');     // resolved in the admin guard
+$web->assignRole('manager');       // resolved in the default guard
+```
+
+Checks without an explicit user use the guard that is logged in. Pass the user yourself when several guards are active at once. Route middleware always uses `$request->user()`, so it follows the route's guard.
 
 ### Time-boxed grants
 
@@ -511,7 +542,7 @@ php artisan vendor:publish --tag=rbac-config
 
 | Table | Holds |
 | --- | --- |
-| `rbac_roles` | Role slug, name, description and rank |
+| `rbac_roles` | Role slug, guard, name, description and rank (slug is unique per guard) |
 | `rbac_role_grants` | The permission and scope each role carries |
 | `rbac_role_assignments` | Which user holds which role, and until when (polymorphic) |
 | `rbac_user_grants` | Direct allows and denies on a user, and until when (polymorphic) |

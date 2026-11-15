@@ -13,6 +13,15 @@ use Siberfx\RbacPermission\Rbac;
  */
 trait HasRbac
 {
+    /**
+     * The authentication guard this user belongs to. Roles are resolved within it.
+     * Override to return another guard, e.g. 'admin'.
+     */
+    public function rbacGuard(): string
+    {
+        return (string) config('auth.defaults.guard', 'web');
+    }
+
     public function roles(): MorphToMany
     {
         return $this->morphToMany(Role::class, 'model', config('rbac.tables.role_assignments'), 'model_id', 'role_id')
@@ -20,13 +29,13 @@ trait HasRbac
     }
 
     /**
-     * True when the user holds the role and it has not expired.
+     * True when the user holds the role in their guard and it has not expired.
      */
     public function hasRole(string $slug): bool
     {
         $pivot = (string) config('rbac.tables.role_assignments');
 
-        return $this->roles()->where('slug', $slug)
+        return $this->roles()->where('slug', $slug)->where('guard', $this->rbacGuard())
             ->where(fn ($q) => $q->whereNull("{$pivot}.expires_at")->orWhere("{$pivot}.expires_at", '>', now()))
             ->exists();
     }

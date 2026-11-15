@@ -184,6 +184,24 @@ return [
 
     /*
     |----------------------------------------------------------------------
+    | Guards
+    |----------------------------------------------------------------------
+    | The roles above belong to the default guard (auth.defaults.guard). For
+    | another guard, add it here with its own roles and ranks. The same slug
+    | may then exist under several guards with different grants.
+    |
+    | Each user model picks its guard with rbacGuard() (HasRbac defaults to the
+    | default guard). Guard names must exist in config/auth.php.
+    |
+    |   'admin' => [
+    |       'roles' => ['manager' => ['billing.*@tenant']],
+    |       'ranks' => ['manager' => 50],
+    |   ],
+    */
+    'guards' => [],
+
+    /*
+    |----------------------------------------------------------------------
     | Console
     |----------------------------------------------------------------------
     | Commands marked with #[RequiresPermission] run as this user. Set

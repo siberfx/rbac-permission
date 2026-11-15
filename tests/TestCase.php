@@ -8,6 +8,7 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Schema;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Siberfx\RbacPermission\RbacPermissionServiceProvider;
+use Siberfx\RbacPermission\Tests\Fixtures\Admin;
 use Siberfx\RbacPermission\Tests\Fixtures\Invoice;
 use Siberfx\RbacPermission\Tests\Fixtures\InvoiceController;
 use Siberfx\RbacPermission\Tests\Fixtures\Team;
@@ -27,6 +28,8 @@ abstract class TestCase extends Orchestra
         $app['config']->set('database.default', 'testing');
         $app['config']->set('auth.providers.users.model', User::class);
         $app['config']->set('rbac.default_scope', 'own');
+        $app['config']->set('auth.guards.admin', ['driver' => 'session', 'provider' => 'admins']);
+        $app['config']->set('auth.providers.admins', ['driver' => 'eloquent', 'model' => Admin::class]);
     }
 
     protected function defineDatabaseMigrations(): void
@@ -36,6 +39,12 @@ abstract class TestCase extends Orchestra
             $table->string('name');
             $table->string('email')->nullable();
             $table->unsignedBigInteger('tenant_id')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('admins', function (Blueprint $table): void {
+            $table->id();
+            $table->string('name');
             $table->timestamps();
         });
 
@@ -62,6 +71,7 @@ abstract class TestCase extends Orchestra
         (require __DIR__.'/../database/migrations/add_rank_to_rbac_roles.php')->up();
         (require __DIR__.'/../database/migrations/add_expires_at_to_rbac_grants.php')->up();
         (require __DIR__.'/../database/migrations/create_rbac_audit_logs_table.php')->up();
+        (require __DIR__.'/../database/migrations/add_guard_to_rbac_roles.php')->up();
     }
 
     protected function defineRoutes($router): void

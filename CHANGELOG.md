@@ -4,6 +4,24 @@ All notable changes to `siberfx/rbac-permission` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] - 2026-11-16
+
+### Added
+
+- Multiple authentication guards. Roles carry a `guard`, and a slug is unique per guard, so `manager` can exist for `web` and `admin` with different grants.
+- `HasRbac::rbacGuard()` says which guard a user model uses (defaults to `auth.defaults.guard`). Roles, ranks and grants are resolved within that guard.
+- `rbac.guards` config: roles and ranks for each additional guard. `rbac:sync` writes every guard unless `--guard` is given.
+- `--guard` option on `rbac:sync`, `rbac:matrix` and `rbac:grant`.
+- Checks without an explicit user use the first logged-in user across the default and configured guards.
+
+### Changed
+
+- `Rbac::role()`, `grant()`, `revoke()`, `sync()` and `matrix()` accept an optional guard. String role names in `assign()` and `unassign()` are resolved in the user's guard.
+
+### Upgrading
+
+- Publish and run the new migration `add_guard_to_rbac_roles`. Existing roles get the default guard. The unique index on `slug` is replaced by one on `(guard, slug)`.
+
 ## [1.3.0] - 2026-11-16
 
 ### Added
