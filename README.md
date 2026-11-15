@@ -324,6 +324,34 @@ The exit code is `0` when allowed and `1` when denied, so it works in scripts an
 
 ---
 
+## 🖥️ Admin screens
+
+An optional Blade UI for roles, role grants and user role assignments. It is off by default.
+
+```php
+// config/rbac.php
+'ui' => [
+    'enabled' => true,
+    'prefix' => 'rbac',                    // served at /rbac/roles
+    'middleware' => ['web', 'auth'],
+],
+```
+
+Every action checks a catalog permission:
+
+| Permission | Lets the user |
+| --- | --- |
+| `admin.role.show` | View roles and their grants |
+| `admin.role.edit` | Add or remove grants on a role |
+| `admin.user.show` | View a user's roles |
+| `admin.user.edit` | Assign or remove a user's roles |
+
+A role editor can only add a grant they already hold at that scope or wider, enforced by `Rbac::canGrant()`. Role assignment follows the rank rules, so an admin cannot hand out a role at their own rank or higher.
+
+The screens are plain Blade with no CDN assets, and they follow light and dark mode. They are a starting point. To change the look, publish the views with `php artisan vendor:publish --tag=rbac-views`. They are then loaded from `resources/views/vendor/rbac`.
+
+---
+
 ## 🧰 Commands
 
 | Command | What it does |

@@ -161,6 +161,35 @@ final class Rbac
     }
 
     /**
+     * May this actor put this permission on a role? They must hold every matching
+     * permission at a scope at least as wide. This stops a role editor from
+     * handing out permissions they do not have themselves.
+     */
+    public function canGrant(Model $actor, string $input): bool
+    {
+        [$pattern, $scope] = PermissionKey::parse($input, (string) config('rbac.default_scope', 'own'));
+
+        $keys = array_values(array_filter(
+            $this->catalog->permissions(),
+            fn (string $key) => PermissionKey::matches($pattern, $key),
+        ));
+
+        if ($keys === []) {
+            return false;
+        }
+
+        foreach ($keys as $key) {
+            $widest = $this->widestScope($key, $actor);
+
+            if ($widest === null || $this->scopes->level($widest) < $this->scopes->level($scope)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * The widest scope the user holds for a permission, ignoring denies (e.g. "tenant").
      */
     public function widestScope(string $permission, ?Model $user = null): ?string

@@ -202,6 +202,22 @@ return [
 
     /*
     |----------------------------------------------------------------------
+    | Admin screens
+    |----------------------------------------------------------------------
+    | A small Blade UI for roles, role grants and user role assignments.
+    | Off by default. Each page checks a catalog permission:
+    |   admin.role.show  to view roles       admin.role.edit  to change grants
+    |   admin.user.show  to view a user      admin.user.edit  to assign roles
+    | Changes never grant more than the actor holds (see Rbac::canGrant()).
+    */
+    'ui' => [
+        'enabled' => false,
+        'prefix' => 'rbac',
+        'middleware' => ['web', 'auth'],
+    ],
+
+    /*
+    |----------------------------------------------------------------------
     | Console
     |----------------------------------------------------------------------
     | Commands marked with #[RequiresPermission] run as this user. Set

@@ -4,6 +4,18 @@ All notable changes to `siberfx/rbac-permission` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] - 2026-11-16
+
+### Added
+
+- Admin screens: Blade pages for roles, role grants and user role assignments, served under `rbac.ui.prefix`. Off by default (`rbac.ui.enabled`).
+- Each page checks a catalog permission: `admin.role.show`, `admin.role.edit`, `admin.user.show`, `admin.user.edit`.
+- `Rbac::canGrant()`. An actor can only put a permission on a role if they hold every matching permission at that scope or wider. This stops role editors from handing out access they lack.
+
+### Upgrading
+
+- No migration. To use the screens, set `rbac.ui.enabled` to `true`.
+
 ## [1.4.0] - 2026-11-16
 
 ### Added

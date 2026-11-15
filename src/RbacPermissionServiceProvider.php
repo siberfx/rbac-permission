@@ -45,6 +45,11 @@ class RbacPermissionServiceProvider extends ServiceProvider
 
         $this->app['router']->aliasMiddleware('rbac', EnsurePermission::class);
 
+        if (config('rbac.ui.enabled', false)) {
+            $this->loadRoutesFrom(__DIR__.'/../routes/rbac.php');
+            $this->loadViewsFrom(__DIR__.'/../resources/views', 'rbac');
+        }
+
         // A bare @elserbac compiles to an elseif with no arguments; treat that as "not allowed".
         Blade::if('rbac', fn (?string $permission = null, mixed $subject = null) => $permission !== null
             && $this->app->make(Rbac::class)->allows($permission, $subject));
@@ -76,6 +81,10 @@ class RbacPermissionServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../config/rbac.php' => config_path('rbac.php'),
         ], 'rbac-config');
+
+        $this->publishes([
+            __DIR__.'/../resources/views' => resource_path('views/vendor/rbac'),
+        ], 'rbac-views');
 
         $this->publishesMigrations([
             __DIR__.'/../database/migrations' => database_path('migrations'),
