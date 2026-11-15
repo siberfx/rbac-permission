@@ -36,6 +36,7 @@ return [
         'role_grants' => 'rbac_role_grants',
         'role_assignments' => 'rbac_role_assignments',
         'user_grants' => 'rbac_user_grants',
+        'audit_logs' => 'rbac_audit_logs',
     ],
 
     /*
@@ -205,6 +206,21 @@ return [
     'cache' => [
         'store' => null,
         'ttl' => 0,
+    ],
+
+    /*
+    |----------------------------------------------------------------------
+    | Audit log
+    |----------------------------------------------------------------------
+    | When enabled, every change to roles, assignments and direct grants is
+    | written to the audit table (rbac.tables.audit_logs). Each row records the
+    | action, the actor (the "by" user, or the authenticated user), the subject,
+    | and the permission, scope, effect and expiry involved.
+    | Every change also fires Siberfx\RbacPermission\Events\RbacChanged, so you
+    | can listen for it even without the table.
+    */
+    'audit' => [
+        'enabled' => false,
     ],
 
     /*

@@ -12,8 +12,10 @@ use Siberfx\RbacPermission\Console\ExplainCommand;
 use Siberfx\RbacPermission\Console\GrantCommand;
 use Siberfx\RbacPermission\Console\MatrixCommand;
 use Siberfx\RbacPermission\Console\SyncCommand;
+use Siberfx\RbacPermission\Events\RbacChanged;
 use Siberfx\RbacPermission\Http\Middleware\EnsurePermission;
 use Siberfx\RbacPermission\Listeners\AuthorizeConsoleCommand;
+use Siberfx\RbacPermission\Listeners\WriteAuditLog;
 use Siberfx\RbacPermission\Scopes\ScopeRegistry;
 use Siberfx\RbacPermission\Support\Catalog;
 
@@ -52,6 +54,7 @@ class RbacPermissionServiceProvider extends ServiceProvider
         }
 
         Event::listen(CommandStarting::class, AuthorizeConsoleCommand::class);
+        Event::listen(RbacChanged::class, WriteAuditLog::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([

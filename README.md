@@ -381,6 +381,37 @@ Expired rows are ignored at once, even if they are still in the table. Assigning
 
 When the grant cache is enabled (`rbac.cache.ttl > 0`), a grant can keep applying for up to `ttl` seconds after it expires. Keep the TTL short if that matters to you.
 
+### Audit log
+
+Every change to roles, assignments and direct grants fires `Siberfx\RbacPermission\Events\RbacChanged`. Turn on `rbac.audit.enabled` to also store each change in `rbac_audit_logs`:
+
+```php
+// config/rbac.php
+'audit' => ['enabled' => true],
+```
+
+| `action` | Fired when |
+| --- | --- |
+| `role.granted` / `role.revoked` | A permission is added to or removed from a role |
+| `role.assigned` / `role.unassigned` | A role is given to or removed from a user |
+| `permission.allowed` / `permission.denied` / `permission.withdrawn` | A direct override is written or removed |
+| `roles.synced` | `rbac:sync` or `Rbac::sync()` runs |
+| `grants.pruned` | `Rbac::pruneExpired()` removes expired rows |
+
+Each row stores the actor (the `by:` user if you passed one, otherwise the authenticated user), the subject, and the permission, scope, effect and expiry involved. Changes that remove nothing are not recorded.
+
+Listen for the event for your own reporting or notifications:
+
+```php
+Event::listen(RbacChanged::class, function (RbacChanged $event) {
+    if ($event->action === 'role.assigned') {
+        Log::info('role assigned', ['by' => $event->actor?->getKey(), 'to' => $event->subject?->getKey()]);
+    }
+});
+```
+
+Audit writes run inside the same request as the change. If the change is in a database transaction that rolls back, its audit row rolls back too.
+
 ---
 
 ## ⚙️ Configuration
@@ -456,6 +487,7 @@ php artisan vendor:publish --tag=rbac-config
 | `rbac_role_grants` | The permission and scope each role carries |
 | `rbac_role_assignments` | Which user holds which role, and until when (polymorphic) |
 | `rbac_user_grants` | Direct allows and denies on a user, and until when (polymorphic) |
+| `rbac_audit_logs` | Change history, when `rbac.audit.enabled` is true |
 
 Model ids are stored as strings, so integer, UUID and ULID keys all work.
 
@@ -490,7 +522,7 @@ Rbac::flush();
 
 - [x] Role hierarchy with "can only assign roles below mine" (v1.1.0)
 - [x] Time-boxed grants (`expires_at`) (v1.2.0)
-- [ ] Permission audit log through the event system
+- [x] Permission audit log through the event system (v1.3.0)
 
 Ideas and pull requests are welcome.
 

@@ -4,6 +4,17 @@ All notable changes to `siberfx/rbac-permission` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] - 2026-11-16
+
+### Added
+
+- `Siberfx\RbacPermission\Events\RbacChanged` is dispatched after every change to roles, assignments and direct grants. Actions: `role.granted`, `role.revoked`, `role.assigned`, `role.unassigned`, `permission.allowed`, `permission.denied`, `permission.withdrawn`, `roles.synced`, `grants.pruned`.
+- Optional audit log. With `rbac.audit.enabled = true`, each event is stored in `rbac_audit_logs` (actor, subject, permission, scope, effect, expiry, properties).
+
+### Upgrading
+
+- Publish and run the new migration `create_rbac_audit_logs_table` if you plan to enable the audit log. Nothing reads or writes the table while `rbac.audit.enabled` is false.
+
 ## [1.2.0] - 2026-11-16
 
 ### Added

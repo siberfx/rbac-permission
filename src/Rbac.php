@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Siberfx\RbacPermission\Exceptions\InvalidPermission;
 use Siberfx\RbacPermission\Exceptions\PermissionDenied;
+use Siberfx\RbacPermission\Events\RbacChanged;
 use Siberfx\RbacPermission\Exceptions\RoleAssignmentDenied;
 use Siberfx\RbacPermission\Models\Role;
 use Siberfx\RbacPermission\Models\RoleGrant;
@@ -299,6 +300,10 @@ final class Rbac
 
         $this->flush();
 
+        if ($grant->wasRecentlyCreated) {
+            $this->record('role.granted', $role, ['role' => $role->slug, 'permission' => $pattern, 'scope' => $scope]);
+        }
+
         return $grant;
     }
 
@@ -314,6 +319,10 @@ final class Rbac
             ->delete();
 
         $this->flush();
+
+        if ($deleted > 0) {
+            $this->record('role.revoked', $role, ['role' => $role->slug, 'permission' => $pattern, 'scope' => $scope]);
+        }
 
         return $deleted;
     }
@@ -335,6 +344,8 @@ final class Rbac
         );
 
         $this->flush();
+
+        $this->record('role.assigned', $user, ['role' => $role->slug, 'expires_at' => $expiresAt], $by);
     }
 
     public function unassign(Model $user, Role|string $role, ?Model $by = null): int
@@ -349,6 +360,10 @@ final class Rbac
             ->delete();
 
         $this->flush();
+
+        if ($deleted > 0) {
+            $this->record('role.unassigned', $user, ['role' => $role->slug], $by);
+        }
 
         return $deleted;
     }
@@ -384,6 +399,10 @@ final class Rbac
 
         $this->flush();
 
+        if ($assignments + $grants > 0) {
+            $this->record('grants.pruned', null, ['assignments' => $assignments, 'grants' => $grants]);
+        }
+
         return $assignments + $grants;
     }
 
@@ -402,6 +421,10 @@ final class Rbac
             ->delete();
 
         $this->flush();
+
+        if ($deleted > 0) {
+            $this->record('permission.withdrawn', $user, ['permission' => $pattern, 'scope' => $scope]);
+        }
 
         return $deleted;
     }
@@ -457,6 +480,8 @@ final class Rbac
             }
 
             $this->flush();
+
+            $this->record('roles.synced', null, $stats);
 
             return $stats;
         });
@@ -638,6 +663,12 @@ final class Rbac
 
         $this->flush();
 
+        $this->record(
+            $effect === Grant::DENY ? 'permission.denied' : 'permission.allowed',
+            $user,
+            ['permission' => $pattern, 'scope' => $scope, 'effect' => $effect, 'expires_at' => $expiresAt],
+        );
+
         return $grant;
     }
 
@@ -691,6 +722,16 @@ final class Rbac
         }
 
         throw new InvalidArgumentException('The subject of a permission check must be an Eloquent model or null.');
+    }
+
+    /**
+     * Announce a change. The actor is the explicit one when given, otherwise the authenticated user.
+     *
+     * @param  array<string, mixed>  $details
+     */
+    private function record(string $action, ?Model $subject, array $details = [], ?Model $actor = null): void
+    {
+        event(new RbacChanged($action, $actor ?? $this->currentUser(), $subject, $details));
     }
 
     private function currentUser(): ?Model
