@@ -60,6 +60,34 @@ It fits a small blog, a multi-team SaaS, or an enterprise back office with the s
 
 ---
 
+## ⚖️ How it compares
+
+A quick look against [spatie/laravel-permission](https://github.com/spatie/laravel-permission), the most widely used Laravel permission package.
+
+| Area | Spatie laravel-permission | RBAC Permission |
+| --- | --- | --- |
+| Permission model | Flat names, such as `edit articles` | `module.resource.verb@scope`, such as `billing.invoice.edit@team` |
+| Record-level reach | Not built in. Write the check per model or policy | Built in: `own`, `team`, `tenant`, `global` scope ladder |
+| List filtering | Not built in. Add `where` clauses yourself | `Rbac::constrain()` produces the exact `WHERE` clause |
+| Wildcards | Supported | Segment wildcards, such as `billing.*@tenant` |
+| Multi-tenancy | Teams support, enabled through config | Scope ladder, with team and tenant as scopes |
+| Deny overrides | Not built in. Access is only granted | Denies always win over allows |
+| Catalog of allowed names | Not built in. Unknown names throw when assigned | Permissions must be listed in the catalog, so typos are rejected |
+| Explaining decisions | Not built in | `rbac:explain` and `Rbac::explain()` show every grant considered |
+| Role hierarchy | Not built in | Ranks: actors can only manage roles below their own rank |
+| Time-limited access | Not built in | Built in: `expires_at` on roles and direct grants |
+| Audit | Not built in | Events, with an optional audit table |
+| Multiple guards | Supported | Not supported. Checks use the default guard only |
+| Ecosystem | Large user base, many third-party integrations, years of production use | New (v1.x), small user base, few integrations |
+
+**Choose Spatie** for a standard, well-supported permission system with flat rules and a large ecosystem, or when you need multiple guards.
+
+**Choose RBAC Permission** when access depends on which records a user may reach, when lists must be filtered by team or tenant, when you need to explain decisions, or when you want hierarchy, expiry and an audit trail built in.
+
+*Spatie's feature list reflects its documentation at the time of writing. Check its current docs before deciding.*
+
+---
+
 ## 🚀 Quick start
 
 **1. Install**
