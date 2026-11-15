@@ -35,13 +35,15 @@
         "illuminate/view": "^12.0 || ^13.0"
     },
     "require-dev": {
+        "backpack/crud": "^7.0.47",
         "filament/filament": "^5.8.3",
         "orchestra/testbench": "^10.0 || ^11.0",
         "pestphp/pest": "^3.8 || ^4.0",
         "pestphp/pest-plugin-laravel": "^3.2 || ^4.0"
     },
     "suggest": {
-        "filament/filament": "Adds the RBAC role screens and the user roles relation manager for Filament panels (^5.8.3)."
+        "filament/filament": "Adds the RBAC role screens and the user roles relation manager for Filament panels (^5.8.3).",
+        "backpack/crud": "Adds RBAC access control to Backpack CRUD controllers and a user model for the Backpack guard (^7.0.47)."
     },
     "autoload": {
         "psr-4": {

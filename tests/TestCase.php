@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Schema;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Siberfx\RbacPermission\RbacPermissionServiceProvider;
 use Siberfx\RbacPermission\Tests\Fixtures\Admin;
+use Siberfx\RbacPermission\Tests\Fixtures\BackpackUser;
 use Siberfx\RbacPermission\Tests\Fixtures\Invoice;
 use Siberfx\RbacPermission\Tests\Fixtures\InvoiceController;
 use Siberfx\RbacPermission\Tests\Fixtures\Team;
@@ -24,6 +25,8 @@ abstract class TestCase extends Orchestra
             RbacPermissionServiceProvider::class,
             \Livewire\LivewireServiceProvider::class,
             \Filament\FilamentServiceProvider::class,
+            \Backpack\Basset\BassetServiceProvider::class,
+            \Backpack\CRUD\BackpackServiceProvider::class,
         ];
     }
 
@@ -35,6 +38,8 @@ abstract class TestCase extends Orchestra
         $app['config']->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
         $app['config']->set('rbac.ui.enabled', true);
         $app['config']->set('auth.guards.admin', ['driver' => 'session', 'provider' => 'admins']);
+        $app['config']->set('auth.guards.backpack', ['driver' => 'session', 'provider' => 'backpack_users']);
+        $app['config']->set('auth.providers.backpack_users', ['driver' => 'eloquent', 'model' => BackpackUser::class]);
         $app['config']->set('auth.providers.admins', ['driver' => 'eloquent', 'model' => Admin::class]);
     }
 

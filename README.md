@@ -80,6 +80,7 @@ A quick look against [spatie/laravel-permission](https://github.com/spatie/larav
 | Multiple guards | Supported | Supported: roles belong to a guard, and a user model picks its guard |
 | Admin screens | Not built in. Available through third-party panels | Built in: Blade role and assignment screens (optional, off by default) |
 | Filament integration | Not built in. Available through third-party plugins | Optional `RbacPlugin` for Filament 5: role screens, grant editor, user roles relation manager |
+| Backpack integration | Not built in. Available through third-party packages | Built in: `HasRbacAccess` for CRUD controllers, `HasBackpackRbac` for admin users |
 | Ecosystem | Large user base, many third-party integrations, years of production use | New (v1.x), small user base, few integrations |
 
 **Choose Spatie** for a standard, well-supported permission system with flat rules and a large ecosystem, or when you need to use it with a wide range of third-party packages.
@@ -397,6 +398,59 @@ What the screens do:
 Access uses the catalog permissions from the admin screens (`admin.role.show`, `admin.role.edit`, `admin.user.show`, `admin.user.edit`). The Roles resource is hidden from users who do not hold them.
 
 `RbacPlugin` and the relation manager use the signed-in user from Filament's guard (`Filament::auth()`).
+
+## 🧱 Backpack integration
+
+For [Backpack for Laravel](https://backpackforlaravel.com) 7. Install Backpack, then use the two traits below.
+
+**1. The admin user** keeps its roles in Backpack's own guard (`backpack.base.guard`), so the admins stay separate from your app's users:
+
+```php
+use Siberfx\RbacPermission\Backpack\HasBackpackRbac;
+
+class BackpackUser extends Authenticatable
+{
+    use HasBackpackRbac;
+}
+```
+
+Sync the roles of that guard with `rbac.guards`, for example `'backpack' => ['roles' => [...]]`, then run `php artisan rbac:sync`.
+
+**2. Each CRUD controller** checks the catalog permissions for its resource:
+
+```php
+use Siberfx\RbacPermission\Backpack\HasRbacAccess;
+
+class InvoiceCrudController extends CrudController
+{
+    use HasRbacAccess;
+
+    protected ?string $rbacResource = 'billing.invoice';
+
+    public function setup(): void
+    {
+        CRUD::setModel(Invoice::class);
+        // ... fields, columns, operations ...
+
+        $this->applyRbacAccess();   // call last
+    }
+}
+```
+
+What it does:
+
+| Backpack operation | Catalog permission |
+| --- | --- |
+| `list`, `show` | `{resource}.show` |
+| `create`, `store` | `{resource}.create` |
+| `update`, `edit`, `reorder` | `{resource}.edit` |
+| `delete` | `{resource}.delete` |
+
+- The **list** is narrowed to the rows the admin may reach (`Rbac::constrain()`), so scope rules apply to the table, not just to single pages.
+- Single records are checked against their scope, so an admin with `billing.invoice.edit@own` can edit only their own invoices.
+- Access rules already set on the panel (for example `$this->crud->denyAccess('delete')`) still apply.
+
+The admin user is the one signed in on the Backpack guard (`backpack_auth()`).
 
 ---
 

@@ -4,6 +4,19 @@ All notable changes to `siberfx/rbac-permission` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.7.0] - 2026-11-16
+
+### Added
+
+- Backpack 7 support (`backpack/crud` 7.0.47 or later, optional and listed in `suggest`):
+  - `Siberfx\RbacPermission\Backpack\HasRbacAccess`: add to a CRUD controller and call `applyRbacAccess()` in `setup()`. Each Backpack operation maps to a catalog verb. Lists are narrowed with `Rbac::constrain()`, and single records are checked against their scope. Access rules already set on the panel still apply.
+  - `Siberfx\RbacPermission\Backpack\HasBackpackRbac`: for the admin user model. Its roles live in the Backpack guard (`backpack.base.guard`).
+- `Siberfx\RbacPermission\Backpack\Access`: the logic behind the trait, usable with any `CrudPanel`.
+
+### Upgrading
+
+- No migration. Install `backpack/crud` 7.0.47 or later to use the Backpack integration.
+
 ## [1.6.0] - 2026-11-16
 
 ### Added
