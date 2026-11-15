@@ -346,6 +346,21 @@ Rbac::widestScope('billing.invoice.show', $user);          // "tenant"
 
 Every write clears the grant cache for the request, and when caching is enabled it invalidates the cache for everyone.
 
+### Role hierarchy
+
+Give each role a rank in `rbac.ranks`. An actor may only assign or remove a role whose rank is **strictly below** the highest rank they hold, so an admin can hand out `manager` but never `admin`.
+
+```php
+$admin = auth()->user();                        // holds "admin" (rank 80)
+
+$target->assignRole('manager', by: $admin);     // allowed (50 < 80)
+$target->assignRole('admin', by: $admin);       // throws RoleAssignmentDenied (80 is not below 80)
+
+Rbac::rankOf($admin);                           // 80
+```
+
+Without `by:` nothing is checked, which is how seeders and trusted jobs run. `rbac:assign` checks against the configured console actor (`rbac.console`).
+
 ---
 
 ## ⚙️ Configuration
@@ -417,7 +432,7 @@ php artisan vendor:publish --tag=rbac-config
 
 | Table | Holds |
 | --- | --- |
-| `rbac_roles` | Role slug, name and description |
+| `rbac_roles` | Role slug, name, description and rank |
 | `rbac_role_grants` | The permission and scope each role carries |
 | `rbac_role_assignments` | Which user holds which role (polymorphic) |
 | `rbac_user_grants` | Direct allows and denies on a user (polymorphic) |
@@ -453,7 +468,7 @@ Rbac::flush();
 
 ## 🗺️ Roadmap
 
-- [ ] Role hierarchy with "can only assign roles below mine"
+- [x] Role hierarchy with "can only assign roles below mine" (v1.1.0)
 - [ ] Time-boxed grants (`expires_at`)
 - [ ] Permission audit log through the event system
 

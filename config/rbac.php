@@ -167,6 +167,22 @@ return [
 
     /*
     |----------------------------------------------------------------------
+    | Role ranks (hierarchy)
+    |----------------------------------------------------------------------
+    | A higher rank outranks a lower one. An actor may only assign or remove a
+    | role whose rank is strictly below the highest rank they hold, so an admin
+    | can hand out "manager" but never "admin". Roles not listed keep rank 0.
+    | Pass the actor as the third argument of Rbac::assign() / unassign().
+    */
+    'ranks' => [
+        'super-admin' => 100,
+        'admin' => 80,
+        'manager' => 50,
+        'staff' => 10,
+    ],
+
+    /*
+    |----------------------------------------------------------------------
     | Console
     |----------------------------------------------------------------------
     | Commands marked with #[RequiresPermission] run as this user. Set

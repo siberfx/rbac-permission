@@ -3,6 +3,7 @@
 namespace Siberfx\RbacPermission\Console;
 
 use Illuminate\Console\Command;
+use Siberfx\RbacPermission\Exceptions\RoleAssignmentDenied;
 use Siberfx\RbacPermission\Rbac;
 
 class AssignCommand extends Command
@@ -26,14 +27,24 @@ class AssignCommand extends Command
             return self::FAILURE;
         }
 
-        if ($this->option('revoke')) {
-            $rbac->unassign($user, $this->argument('role'));
-            $this->info("Revoked [{$this->argument('role')}] from user {$user->getKey()}.");
+        // The configured console actor (if any) is held to the role hierarchy.
+        $actor = $rbac->consoleActor();
 
-            return self::SUCCESS;
+        try {
+            if ($this->option('revoke')) {
+                $rbac->unassign($user, $this->argument('role'), $actor);
+                $this->info("Revoked [{$this->argument('role')}] from user {$user->getKey()}.");
+
+                return self::SUCCESS;
+            }
+
+            $rbac->assign($user, $this->argument('role'), $actor);
+        } catch (RoleAssignmentDenied $e) {
+            $this->error($e->getMessage());
+
+            return self::FAILURE;
         }
 
-        $rbac->assign($user, $this->argument('role'));
         $this->info("Assigned [{$this->argument('role')}] to user {$user->getKey()}.");
 
         return self::SUCCESS;

@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Siberfx\RbacPermission\Exceptions\InvalidPermission;
 use Siberfx\RbacPermission\Exceptions\PermissionDenied;
+use Siberfx\RbacPermission\Exceptions\RoleAssignmentDenied;
 use Siberfx\RbacPermission\Models\Role;
 use Siberfx\RbacPermission\Models\RoleGrant;
 use Siberfx\RbacPermission\Models\UserGrant;
@@ -243,7 +244,7 @@ final class Rbac
      | Management: roles, role grants, assignments, direct overrides
      | ------------------------------------------------------------------ */
 
-    public function role(string $slug, ?string $name = null, ?string $description = null): Role
+    public function role(string $slug, ?string $name = null, ?string $description = null, ?int $rank = null): Role
     {
         if (! preg_match('/^[a-z][a-z0-9_-]*$/', $slug)) {
             throw new InvalidArgumentException("Invalid role slug [{$slug}].");
@@ -251,8 +252,33 @@ final class Rbac
 
         return Role::query()->firstOrCreate(
             ['slug' => $slug],
-            ['name' => $name ?? Str::headline($slug), 'description' => $description],
+            ['name' => $name ?? Str::headline($slug), 'description' => $description, 'rank' => $rank ?? 0],
         );
+    }
+
+    /**
+     * The highest rank among the roles the user holds, or null when they hold none.
+     */
+    public function rankOf(Model $user): ?int
+    {
+        $rank = $user->getConnection()->table($this->table('role_assignments').' as a')
+            ->join($this->table('roles').' as r', 'r.id', '=', 'a.role_id')
+            ->where('a.model_type', $user->getMorphClass())
+            ->where('a.model_id', (string) $user->getKey())
+            ->max('r.rank');
+
+        return $rank === null ? null : (int) $rank;
+    }
+
+    /**
+     * May this actor assign or remove the role? Only roles strictly below their own rank.
+     */
+    public function canAssign(Model $actor, Role|string $role): bool
+    {
+        $role = $role instanceof Role ? $role : $this->findRole($role);
+        $rank = $this->rankOf($actor);
+
+        return $rank !== null && $rank > (int) $role->rank;
     }
 
     /**
@@ -290,9 +316,15 @@ final class Rbac
         return $deleted;
     }
 
-    public function assign(Model $user, Role|string $role): void
+    /**
+     * Give the user a role. When $by is given (the actor making the change), the
+     * role must sit strictly below the actor's rank. Without $by nothing is checked,
+     * which is how seeders and trusted commands run.
+     */
+    public function assign(Model $user, Role|string $role, ?Model $by = null): void
     {
         $role = $role instanceof Role ? $role : $this->findRole($role);
+        $this->assertCanManage($by, $role);
 
         $user->getConnection()->table($this->table('role_assignments'))->updateOrInsert(
             ['role_id' => $role->getKey(), 'model_type' => $user->getMorphClass(), 'model_id' => (string) $user->getKey()],
@@ -302,9 +334,10 @@ final class Rbac
         $this->flush();
     }
 
-    public function unassign(Model $user, Role|string $role): int
+    public function unassign(Model $user, Role|string $role, ?Model $by = null): int
     {
         $role = $role instanceof Role ? $role : $this->findRole($role);
+        $this->assertCanManage($by, $role);
 
         $deleted = $user->getConnection()->table($this->table('role_assignments'))
             ->where('role_id', $role->getKey())
@@ -364,8 +397,14 @@ final class Rbac
         return DB::transaction(function () use ($parsed, $prune) {
             $stats = ['roles' => 0, 'grants' => 0, 'pruned' => 0];
 
+            $ranks = (array) config('rbac.ranks', []);
+
             foreach ($parsed as $slug => $grants) {
                 $role = $this->role($slug);
+
+                if (array_key_exists($slug, $ranks)) {
+                    $role->update(['rank' => (int) $ranks[$slug]]);
+                }
 
                 RoleGrant::query()->where('role_id', $role->getKey())->delete();
 
@@ -586,6 +625,15 @@ final class Rbac
         $this->catalog->assertGrantable($pattern);
 
         return [$pattern, $scope];
+    }
+
+    private function assertCanManage(?Model $actor, Role $role): void
+    {
+        if ($actor === null || $this->canAssign($actor, $role)) {
+            return;
+        }
+
+        throw new RoleAssignmentDenied($role->slug, $this->rankOf($actor));
     }
 
     private function findRole(string $slug): Role

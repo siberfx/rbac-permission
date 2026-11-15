@@ -2,6 +2,7 @@
 
 namespace Siberfx\RbacPermission\Concerns;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Siberfx\RbacPermission\Models\Role;
 use Siberfx\RbacPermission\Rbac;
@@ -21,14 +22,17 @@ trait HasRbac
         return $this->roles()->where('slug', $slug)->exists();
     }
 
-    public function assignRole(Role|string $role): void
+    /**
+     * Pass $by to hold the change to the role hierarchy (see rbac.ranks).
+     */
+    public function assignRole(Role|string $role, ?Model $by = null): void
     {
-        app(Rbac::class)->assign($this, $role);
+        app(Rbac::class)->assign($this, $role, $by);
     }
 
-    public function removeRole(Role|string $role): int
+    public function removeRole(Role|string $role, ?Model $by = null): int
     {
-        return app(Rbac::class)->unassign($this, $role);
+        return app(Rbac::class)->unassign($this, $role, $by);
     }
 
     public function allowPermission(string $permission): void
