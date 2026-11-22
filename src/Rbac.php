@@ -35,6 +35,13 @@ final class Rbac
     /** @var array<string, list<Grant>> */
     private array $memo = [];
 
+    /**
+     * Grants per user and permission key, so each pattern is matched once per request.
+     *
+     * @var array<string, array<string, list<Grant>>>
+     */
+    private array $matched = [];
+
     public function __construct(
         private readonly Catalog $catalog,
         private readonly ScopeRegistry $scopes,
@@ -482,10 +489,11 @@ final class Rbac
 
     /**
      * Make the database match config('rbac.roles'). Roles are written in one
-     * transaction, after every grant has been validated.
+     * transaction, after every grant has been validated. Only grants that changed
+     * are written: unchanged rows keep their ids, and a duplicate entry is ignored.
      *
      * @param  array<string, list<string>>  $definitions
-     * @return array{roles: int, grants: int, pruned: int}
+     * @return array{roles: int, grants: int, added: int, removed: int, pruned: int}
      */
     public function sync(array $definitions, bool $prune = false, ?string $guard = null): array
     {
@@ -498,7 +506,7 @@ final class Rbac
         }
 
         return DB::transaction(function () use ($parsed, $prune, $guard) {
-            $stats = ['roles' => 0, 'grants' => 0, 'pruned' => 0];
+            $stats = ['roles' => 0, 'grants' => 0, 'added' => 0, 'removed' => 0, 'pruned' => 0];
 
             $ranks = (array) $this->guardSetting($guard, 'ranks');
 
@@ -509,17 +517,32 @@ final class Rbac
                     $role->update(['rank' => (int) $ranks[$slug]]);
                 }
 
-                RoleGrant::query()->where('role_id', $role->getKey())->delete();
+                $wanted = [];
 
                 foreach ($grants as [$pattern, $scope]) {
+                    $wanted["{$pattern}@{$scope}"] = [$pattern, $scope];
+                }
+
+                $existing = RoleGrant::query()->where('role_id', $role->getKey())->get()
+                    ->keyBy(fn (RoleGrant $grant) => "{$grant->permission}@{$grant->scope}");
+
+                $stale = array_diff_key($existing->all(), $wanted);
+
+                if ($stale !== []) {
+                    RoleGrant::query()->whereKey(array_map(fn (RoleGrant $grant) => $grant->getKey(), array_values($stale)))->delete();
+                    $stats['removed'] += count($stale);
+                }
+
+                foreach (array_diff_key($wanted, $existing->all()) as [$pattern, $scope]) {
                     RoleGrant::query()->create([
                         'role_id' => $role->getKey(),
                         'permission' => $pattern,
                         'scope' => $scope,
                     ]);
-                    $stats['grants']++;
+                    $stats['added']++;
                 }
 
+                $stats['grants'] += count($wanted);
                 $stats['roles']++;
             }
 
@@ -609,11 +632,11 @@ final class Rbac
      */
     public function flush(): void
     {
-        $this->memo = [];
+        $this->forgetMemo();
 
         if ((int) config('rbac.cache.ttl', 0) > 0) {
             DB::afterCommit(function (): void {
-                $this->memo = [];
+                $this->forgetMemo();
                 $this->store()->forever('rbac.version', Str::random(12));
             });
         }
@@ -638,12 +661,21 @@ final class Rbac
      */
     private function matching(Model $user, string $permission): array
     {
+        // Pattern matching is memoised; expiry is checked on every call, as time moves on.
+        $grants = $this->matched[$this->memoKey($user)][$permission] ??= array_values(array_filter(
+            $this->grantsFor($user),
+            fn (Grant $grant) => PermissionKey::matches($grant->permission, $permission),
+        ));
+
         $now = now()->getTimestamp();
 
-        return array_values(array_filter(
-            $this->grantsFor($user),
-            fn (Grant $grant) => $grant->isActive($now) && PermissionKey::matches($grant->permission, $permission),
-        ));
+        return array_values(array_filter($grants, fn (Grant $grant) => $grant->isActive($now)));
+    }
+
+    private function forgetMemo(): void
+    {
+        $this->memo = [];
+        $this->matched = [];
     }
 
     /**

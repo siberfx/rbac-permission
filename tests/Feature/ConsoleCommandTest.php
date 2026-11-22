@@ -63,3 +63,9 @@ test('unattended runs are allowed only when explicitly enabled', function () {
         ->expectsOutput('cache cleared')
         ->assertExitCode(0);
 });
+
+test('the console listener looks up only the command being run', function () {
+    $this->artisan('rbac:matrix')->assertSuccessful();
+
+    expect(app()->bound(\Siberfx\RbacPermission\Listeners\AuthorizeConsoleCommand::ARTISAN))->toBeTrue();
+});

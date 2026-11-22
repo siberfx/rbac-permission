@@ -74,3 +74,26 @@ test('rbac:assign and rbac:grant write through the same API', function () {
 
     expect(Rbac::allows('billing.invoice.show', null, $user))->toBeTrue();
 });
+
+test('sync only writes the grants that changed', function () {
+    Rbac::sync(['manager' => ['billing.invoice.show@team', 'billing.invoice.edit@team']]);
+    $role = Role::query()->where('slug', 'manager')->firstOrFail();
+    $kept = $role->grants()->where('permission', 'billing.invoice.show')->value('id');
+
+    $stats = Rbac::sync(['manager' => ['billing.invoice.show@team', 'billing.invoice.approve@team']]);
+
+    expect($stats)->toMatchArray(['roles' => 1, 'grants' => 2, 'added' => 1, 'removed' => 1])
+        ->and($role->grants()->where('permission', 'billing.invoice.show')->value('id'))->toBe($kept)
+        ->and($role->grants()->pluck('permission')->sort()->values()->all())
+        ->toBe(['billing.invoice.approve', 'billing.invoice.show']);
+
+    expect(Rbac::sync(['manager' => ['billing.invoice.show@team', 'billing.invoice.approve@team']]))
+        ->toMatchArray(['added' => 0, 'removed' => 0]);
+});
+
+test('sync ignores a grant listed twice', function () {
+    $stats = Rbac::sync(['manager' => ['billing.invoice.show@team', 'billing.invoice.show@team']]);
+
+    expect($stats)->toMatchArray(['grants' => 1, 'added' => 1])
+        ->and(Role::query()->where('slug', 'manager')->firstOrFail()->grants()->count())->toBe(1);
+});

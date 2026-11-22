@@ -5,6 +5,8 @@ namespace Siberfx\RbacPermission\Listeners;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Support\Facades\Artisan;
 use ReflectionClass;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Command\LazyCommand;
 use Siberfx\RbacPermission\Attributes\RequiresPermission;
 use Siberfx\RbacPermission\Exceptions\PermissionDenied;
 use Siberfx\RbacPermission\Rbac;
@@ -15,11 +17,14 @@ use Siberfx\RbacPermission\Rbac;
  */
 final class AuthorizeConsoleCommand
 {
+    /** Container key of the running Artisan application, set by the service provider. */
+    public const ARTISAN = 'rbac.artisan';
+
     public function __construct(private readonly Rbac $rbac) {}
 
     public function handle(CommandStarting $event): void
     {
-        $command = Artisan::all()[$event->command] ?? null;
+        $command = $this->command((string) $event->command);
 
         if ($command === null) {
             return;
@@ -48,5 +53,26 @@ final class AuthorizeConsoleCommand
         foreach ($required as $item) {
             $this->rbac->enforce($item->permission, null, $actor);
         }
+    }
+
+    /**
+     * Loads only the command being run. Artisan::all() would build every
+     * registered command on each run, so it is only the fallback.
+     */
+    private function command(string $name): ?Command
+    {
+        if (! app()->bound(self::ARTISAN)) {
+            return Artisan::all()[$name] ?? null;
+        }
+
+        $artisan = app(self::ARTISAN);
+
+        if ($name === '' || ! $artisan->has($name)) {
+            return null;
+        }
+
+        $command = $artisan->get($name);
+
+        return $command instanceof LazyCommand ? $command->getCommand() : $command;
     }
 }

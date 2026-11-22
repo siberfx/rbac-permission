@@ -27,7 +27,7 @@ class SyncCommand extends Command
 
             $stats = $rbac->sync($definitions, (bool) $this->option('prune'), $guard);
 
-            $this->info("[{$guard}] Synced {$stats['roles']} role(s) with {$stats['grants']} grant(s).");
+            $this->info("[{$guard}] Synced {$stats['roles']} role(s) with {$stats['grants']} grant(s): {$stats['added']} added, {$stats['removed']} removed.");
 
             if ($this->option('prune')) {
                 $this->line("[{$guard}] Pruned {$stats['pruned']} role(s).");

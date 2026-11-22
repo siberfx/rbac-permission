@@ -4,6 +4,14 @@ All notable changes to `siberfx/rbac-permission` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.8.1] - 2026-11-22
+
+### Changed
+
+- Faster permission checks. The grants that match a permission key are now looked up once per user and key in each request. Before, every check scanned all of the user's grants. Expiry is still checked on every call.
+- `rbac:sync` writes only the grants that changed. Unchanged grants keep their rows and ids, and a grant listed twice in config is stored once. Before, every run deleted and recreated every grant. `Rbac::sync()` also returns `added` and `removed` counts, and the command prints them.
+- The console listener behind `#[RequiresPermission]` now loads only the command being run. Before, it built every registered command on each `artisan` call through `Artisan::all()`, which is still the fallback.
+
 ## [1.8.0] - 2026-11-22
 
 ### Security

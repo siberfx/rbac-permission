@@ -2,6 +2,7 @@
 
 namespace Siberfx\RbacPermission;
 
+use Illuminate\Console\Application as ArtisanApplication;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
@@ -71,6 +72,9 @@ class RbacPermissionServiceProvider extends ServiceProvider
         }
 
         Event::listen(CommandStarting::class, AuthorizeConsoleCommand::class);
+
+        // Keep the Artisan application, so the listener can load just the running command.
+        ArtisanApplication::starting(fn (ArtisanApplication $artisan) => $this->app->instance(AuthorizeConsoleCommand::ARTISAN, $artisan));
         Event::listen(RbacChanged::class, WriteAuditLog::class);
 
         if ($this->app->runningInConsole()) {
