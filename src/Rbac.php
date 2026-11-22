@@ -6,6 +6,7 @@ namespace Siberfx\RbacPermission;
 
 use DateTimeInterface;
 use Illuminate\Contracts\Cache\Factory as CacheFactory;
+use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -120,6 +121,8 @@ final class Rbac
     /**
      * Gate::before hook. Returns null for names outside the catalog, so other
      * gates keep working.
+     *
+     * @param  array<array-key, mixed>  $arguments  the Gate arguments; the first may be the subject
      */
     public function gate(string $ability, mixed $user, array $arguments = []): ?bool
     {
@@ -243,6 +246,11 @@ final class Rbac
     /**
      * Narrow a query to the rows the user may reach for this permission.
      *   Rbac::constrain(Invoice::query(), 'billing.invoice.show')->paginate();
+     *
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
      */
     public function constrain(Builder $query, string $permission, ?Model $user = null): Builder
     {
@@ -836,7 +844,7 @@ final class Rbac
     /**
      * Keep rows that have no expiry or whose expiry is still in the future.
      */
-    private function whereActive(Builder|QueryBuilder $query, string $column): Builder|QueryBuilder
+    private function whereActive(QueryBuilder $query, string $column): QueryBuilder
     {
         return $query->where(fn ($q) => $q->whereNull($column)->orWhere($column, '>', now()));
     }
@@ -886,6 +894,8 @@ final class Rbac
     /**
      * A setting for a guard. The default guard reads the top-level key (roles, ranks);
      * other guards read rbac.guards.{guard}.{key}.
+     *
+     * @return array<string, mixed>
      */
     private function guardSetting(string $guard, string $key): array
     {
@@ -950,7 +960,7 @@ final class Rbac
         return $this->store()->rememberForever('rbac.version', fn () => Str::random(12));
     }
 
-    private function store()
+    private function store(): CacheRepository
     {
         return $this->cache->store(config('rbac.cache.store'));
     }

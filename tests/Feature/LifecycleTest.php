@@ -7,6 +7,8 @@ use Siberfx\RbacPermission\Facades\Rbac;
 use Siberfx\RbacPermission\Rbac as RbacService;
 
 test('memoised grants do not outlive a request or a queued job', function () {
+    // The per-request memo only: a write that bypasses the Rbac API is not seen by the cross-request cache.
+    config(['rbac.cache.ttl' => 0]);
     $user = $this->makeUser(['name' => 'Jane']);
 
     expect(Rbac::allows('billing.invoice.show', null, $user))->toBeFalse();

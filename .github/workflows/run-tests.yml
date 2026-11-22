@@ -66,3 +66,100 @@ jobs:
 
       - name: Execute tests
         run: vendor/bin/pest
+
+  databases:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        db: [mysql, mariadb, pgsql]
+        laravel: ['12.*', '13.*']
+        include:
+          - laravel: '12.*'
+            testbench: '10.*'
+          - laravel: '13.*'
+            testbench: '11.*'
+          - db: mysql
+            image: 'mysql:8.4'
+            port: 3306
+            health: 'mysqladmin ping -h 127.0.0.1'
+          - db: mariadb
+            image: 'mariadb:11'
+            port: 3306
+            health: 'healthcheck.sh --connect --innodb_initialized'
+          - db: pgsql
+            image: 'postgres:17'
+            port: 5432
+            health: 'pg_isready'
+
+    name: ${{ matrix.db }} - Laravel ${{ matrix.laravel }}
+
+    services:
+      database:
+        image: ${{ matrix.image }}
+        env:
+          MYSQL_DATABASE: rbac_permission_test
+          MYSQL_ROOT_PASSWORD: password
+          MARIADB_DATABASE: rbac_permission_test
+          MARIADB_ROOT_PASSWORD: password
+          POSTGRES_DB: rbac_permission_test
+          POSTGRES_USER: root
+          POSTGRES_PASSWORD: password
+        ports:
+          - ${{ matrix.port }}:${{ matrix.port }}
+        options: >-
+          --health-cmd="${{ matrix.health }}"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pdo, sqlite, pdo_sqlite, pdo_mysql, pdo_pgsql, intl, fileinfo
+          coverage: none
+
+      - name: Install dependencies
+        run: |
+          composer require "illuminate/support:${{ matrix.laravel }}" --no-interaction --no-update
+          composer require --dev "orchestra/testbench:${{ matrix.testbench }}" --no-interaction --no-update
+          composer update --prefer-stable --prefer-dist --no-interaction
+
+      - name: Execute tests
+        run: vendor/bin/pest
+        env:
+          RBAC_TEST_DB: ${{ matrix.db }}
+          RBAC_TEST_DB_HOST: 127.0.0.1
+          RBAC_TEST_DB_PORT: ${{ matrix.port }}
+          RBAC_TEST_DB_DATABASE: rbac_permission_test
+          RBAC_TEST_DB_USERNAME: root
+          RBAC_TEST_DB_PASSWORD: password
+
+  cache:
+    runs-on: ubuntu-latest
+
+    name: Grant cache on
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pdo, sqlite, pdo_sqlite, intl, fileinfo
+          coverage: none
+
+      - name: Install dependencies
+        run: composer update --prefer-stable --prefer-dist --no-interaction
+
+      - name: Execute tests with rbac.cache.ttl > 0
+        run: vendor/bin/pest
+        env:
+          RBAC_TEST_CACHE: '1'

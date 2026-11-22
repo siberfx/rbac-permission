@@ -20,7 +20,7 @@ interface ScopeContract
     public function covers(Model $user, Model $subject): bool;
 
     /**
-     * @param  Builder<Model>|QueryBuilder  $query
+     * @param  Builder<covariant Model>|QueryBuilder  $query
      */
     public function constrain($query, Model $user, Model $model): void;
 }

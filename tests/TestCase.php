@@ -7,9 +7,12 @@ namespace Siberfx\RbacPermission\Tests;
 use Backpack\Basset\BassetServiceProvider;
 use Backpack\CRUD\BackpackServiceProvider;
 use Filament\FilamentServiceProvider;
+use Illuminate\Contracts\Console\Kernel as ConsoleKernel;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
@@ -36,9 +39,17 @@ abstract class TestCase extends Orchestra
         ];
     }
 
+    /** Tables the tests create: fixtures first, then the RBAC tables (dropped in reverse). */
+    private const FIXTURE_TABLES = ['users', 'admins', 'teams', 'team_user', 'invoices'];
+
     protected function defineEnvironment($app): void
     {
-        $app['config']->set('database.default', 'testing');
+        $app['config']->set('database.default', $this->configureTestDatabase($app));
+
+        // RBAC_TEST_CACHE=1 runs every test with the cross-request grant cache on, as CI does once.
+        if (getenv('RBAC_TEST_CACHE')) {
+            $app['config']->set('rbac.cache', ['store' => 'array', 'ttl' => 3600]);
+        }
         $app['config']->set('auth.providers.users.model', User::class);
         $app['config']->set('rbac.default_scope', 'own');
         $app['config']->set('app.key', 'base64:'.base64_encode(str_repeat('a', 32)));
@@ -49,8 +60,68 @@ abstract class TestCase extends Orchestra
         $app['config']->set('auth.providers.admins', ['driver' => 'eloquent', 'model' => Admin::class]);
     }
 
+    /**
+     * In-memory SQLite by default. Set RBAC_TEST_DB=mysql|mariadb|pgsql (with RBAC_TEST_DB_HOST,
+     * _PORT, _DATABASE, _USERNAME, _PASSWORD) to run on a real server, as CI does.
+     */
+    private function configureTestDatabase($app): string
+    {
+        $driver = getenv('RBAC_TEST_DB') ?: 'sqlite';
+
+        if ($driver === 'sqlite') {
+            return 'testing';
+        }
+
+        $app['config']->set("database.connections.{$driver}", array_merge(
+            (array) $app['config']->get("database.connections.{$driver}", []),
+            array_filter([
+                'driver' => $driver,
+                'host' => getenv('RBAC_TEST_DB_HOST') ?: '127.0.0.1',
+                'port' => getenv('RBAC_TEST_DB_PORT') ?: null,
+                'database' => getenv('RBAC_TEST_DB_DATABASE') ?: 'rbac_permission_test',
+                'username' => getenv('RBAC_TEST_DB_USERNAME') ?: 'root',
+                'password' => getenv('RBAC_TEST_DB_PASSWORD') ?: '',
+            ], fn ($value) => $value !== null),
+        ));
+
+        return $driver;
+    }
+
+    /**
+     * Server databases only (in-memory SQLite takes its own path in RefreshDatabase).
+     * migrate:fresh would drop the tables defineDatabaseMigrations() just built, so
+     * only Laravel's migrations table is ensured here, then each test runs in a transaction.
+     */
+    protected function refreshTestDatabase(): void
+    {
+        if (! RefreshDatabaseState::$migrated) {
+            if (! Schema::hasTable($this->migrationsTable())) {
+                $this->artisan('migrate:install');
+
+                // As Laravel's own refreshTestDatabase() does: drop the Artisan application
+                // that command built, so the next one picks up rerouted console events.
+                $this->app[ConsoleKernel::class]->setArtisan(null);
+            }
+
+            RefreshDatabaseState::$migrated = true;
+        }
+
+        $this->beginDatabaseTransaction();
+    }
+
     protected function defineDatabaseMigrations(): void
     {
+        // A server database outlives the test: start every test from empty tables.
+        // The migrations table is kept, as the migration tests read it, but emptied:
+        // on MySQL a schema change commits, so a test's rows could survive its rollback.
+        foreach ([...array_reverse(array_values((array) config('rbac.tables'))), ...self::FIXTURE_TABLES] as $table) {
+            Schema::dropIfExists($table);
+        }
+
+        if (Schema::hasTable($this->migrationsTable())) {
+            DB::table($this->migrationsTable())->delete();
+        }
+
         Schema::create('users', function (Blueprint $table): void {
             $table->id();
             $table->string('name');
@@ -88,6 +159,13 @@ abstract class TestCase extends Orchestra
         foreach (RbacPermissionServiceProvider::MIGRATIONS as $migration) {
             (require __DIR__."/../database/migrations/{$migration}.php")->up();
         }
+    }
+
+    private function migrationsTable(): string
+    {
+        $repository = config('database.migrations');
+
+        return (string) (is_array($repository) ? ($repository['table'] ?? 'migrations') : ($repository ?? 'migrations'));
     }
 
     protected function defineRoutes($router): void

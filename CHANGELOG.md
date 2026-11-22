@@ -4,6 +4,22 @@ All notable changes to `siberfx/rbac-permission` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.8.4] - 2026-11-22
+
+### Added
+
+- CI runs the suite on MySQL 8.4, MariaDB 11 and PostgreSQL 17 (Laravel 12 and 13), next to SQLite. It also runs one job with the grant cache on. The package needed no changes: all 132 tests pass on every database.
+- The test suite can target a database server: `RBAC_TEST_DB=mysql|mariadb|pgsql` with `RBAC_TEST_DB_HOST`, `_PORT`, `_DATABASE`, `_USERNAME` and `_PASSWORD`. `RBAC_TEST_CACHE=1` turns the grant cache on for every test. See "Testing" in the README.
+
+### Changed
+
+- Static analysis raised from level 5 to level 6. Generics and array shapes are now declared: `Rbac::constrain()` keeps the query's model type, and the facade lists the shapes of `explain()`, `sync()` and `matrix()`.
+- The README roadmap lists everything shipped up to 1.8.4 and what is planned next.
+
+### Fixed
+
+- Test setup on database servers: `RefreshDatabase` dropped the tables the setup had just built, and on a fresh database the console tests ran without Laravel's rerouted command events. Neither affected the package itself.
+
 ## [1.8.3] - 2026-11-22
 
 ### Added

@@ -18,7 +18,7 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 interface ExcludesRows
 {
     /**
-     * @param  Builder<Model>|QueryBuilder  $query
+     * @param  Builder<covariant Model>|QueryBuilder  $query
      */
     public function exclude($query, Model $user, Model $model): void;
 }

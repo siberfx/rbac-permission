@@ -727,6 +727,15 @@ composer analyse   # Larastan
 composer check     # all of the above plus the tests, as CI runs them
 ```
 
+The suite runs on in-memory SQLite by default. To run it on a database server, as CI does for MySQL, MariaDB and PostgreSQL, point it at an empty database:
+
+```bash
+RBAC_TEST_DB=pgsql RBAC_TEST_DB_PORT=5432 RBAC_TEST_DB_DATABASE=rbac_permission_test \
+RBAC_TEST_DB_USERNAME=root RBAC_TEST_DB_PASSWORD= vendor/bin/pest
+```
+
+`RBAC_TEST_DB` accepts `mysql`, `mariadb` or `pgsql`. The tests drop and recreate their own tables, so never point them at a database you use. `RBAC_TEST_CACHE=1` runs every test with the grant cache on.
+
 The suite covers the grammar and wildcards, every scope and deny overrides, query constraints, Gate and Blade integration, HTTP enforcement from attributes and route arguments, console guarding, roles as code, the matrix and explanations.
 
 In your own application, reset the grant cache between tests if you enable it:
@@ -742,6 +751,17 @@ Rbac::flush();
 - [x] Role hierarchy with "can only assign roles below mine" (v1.1.0)
 - [x] Time-boxed grants (`expires_at`) (v1.2.0)
 - [x] Permission audit log through the event system (v1.3.0)
+- [x] Multiple authentication guards (v1.4.0)
+- [x] Blade admin screens for roles and user assignments (v1.5.0)
+- [x] Filament 5 integration (v1.6.0)
+- [x] Backpack 7 integration (v1.7.0)
+- [x] Security hardening and one guarded migration (v1.8.0)
+- [x] Separate RBAC database connection, `Unrestricted` scopes, `--guard` on commands (v1.8.2)
+- [x] `rbac:prune-expired`, coding standards and static analysis (v1.8.3)
+- [x] Tested on SQLite, MySQL, MariaDB and PostgreSQL, with and without the grant cache (v1.8.4)
+- [ ] A `Decision` enum alongside the `'allow'` / `'deny'` / `'none'` strings
+- [ ] A `whereRbac()` query scope on resource models
+- [ ] A user's effective permissions as a list, for SPA and Inertia frontends
 
 Ideas and pull requests are welcome.
 
