@@ -472,9 +472,10 @@ The admin user is the one signed in on the Backpack guard (`backpack_auth()`).
 | `rbac:matrix [--only-granted] [--guard=]` | Prints the role by permission grid for one guard, showing the widest scope of each grant. |
 | `rbac:explain {permission} {user} [--on-model= --on=] [--guard=]` | Explains a decision, with the grants that were considered. |
 | `rbac:assign {role} {user} [--revoke] [--expires=] [--guard=]` | Gives or removes a role for a user. `--expires` makes the role time-boxed. |
+| `rbac:grant {role} {permission} [--revoke] [--guard=]` | Adds or removes a grant on a role. The role is created if it is missing. |
+| `rbac:prune-expired` | Deletes role assignments and direct grants whose expiry has passed. |
 
 `--guard` picks the user model from that guard's auth provider, e.g. `--guard=admin` for your `Admin` model. `--model=` still overrides it.
-| `rbac:grant {role} {permission} [--revoke] [--guard=]` | Adds or removes a grant on a role. The role is created if it is missing. |
 
 ```bash
 php artisan rbac:matrix
@@ -581,6 +582,13 @@ php artisan rbac:assign staff 42 --expires="+7 days"
 Expired rows are ignored at once, even if they are still in the table. Assigning a role again without an expiry makes it permanent.
 
 This also holds with the grant cache enabled (`rbac.cache.ttl > 0`): each cached grant carries its expiry and stops applying on time.
+
+Expired rows stay in the tables until you prune them. Schedule the prune command to keep the tables small:
+
+```php
+// routes/console.php
+Schedule::command('rbac:prune-expired')->daily();
+```
 
 ### Audit log
 
@@ -710,6 +718,15 @@ Or run it directly:
 vendor/bin/pest
 ```
 
+Coding standards and static analysis:
+
+```bash
+composer lint      # Pint: Laravel preset, imported classes, declare(strict_types=1)
+composer format    # apply the Pint fixes
+composer analyse   # Larastan
+composer check     # all of the above plus the tests, as CI runs them
+```
+
 The suite covers the grammar and wildcards, every scope and deny overrides, query constraints, Gate and Blade integration, HTTP enforcement from attributes and route arguments, console guarding, roles as code, the matrix and explanations.
 
 In your own application, reset the grant cache between tests if you enable it:
@@ -734,7 +751,7 @@ Ideas and pull requests are welcome.
 
 1. Fork the repository and create a feature branch.
 2. Add a Pest test that fails without your change.
-3. Run `composer test` and make sure it passes.
+3. Run `composer check` (coding standards, static analysis and tests) and make sure it passes. Every PHP file starts with `declare(strict_types=1);` and imports the classes it uses; `composer format` fixes both.
 4. Open a pull request with a clear description.
 
 Please follow [Semantic Versioning](https://semver.org/) for releases. Notable changes go into [CHANGELOG.md](CHANGELOG.md).

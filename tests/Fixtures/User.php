@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Tests\Fixtures;
 
-use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Siberfx\RbacPermission\Concerns\HasRbac;
 
 class User extends Authenticatable

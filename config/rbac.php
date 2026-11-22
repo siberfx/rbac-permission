@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Siberfx\RbacPermission\Scopes\GlobalScope;
 use Siberfx\RbacPermission\Scopes\OwnScope;
 use Siberfx\RbacPermission\Scopes\TeamScope;

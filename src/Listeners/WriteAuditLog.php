@@ -1,9 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Listeners;
 
 use DateTimeInterface;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Siberfx\RbacPermission\Events\RbacChanged;
 

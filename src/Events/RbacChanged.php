@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Events;
 
 use Illuminate\Database\Eloquent\Model;

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Siberfx\RbacPermission\Exceptions\InvalidPermission;
 use Siberfx\RbacPermission\Support\PermissionKey;
 

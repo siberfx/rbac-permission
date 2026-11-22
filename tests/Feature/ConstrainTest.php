@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Siberfx\RbacPermission\Facades\Rbac;
 use Siberfx\RbacPermission\Tests\Fixtures\Invoice;
 

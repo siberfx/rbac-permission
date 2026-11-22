@@ -1,11 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Contracts\Console\Kernel;
-use Symfony\Component\Console\Input\StringInput;
-use Symfony\Component\Console\Output\BufferedOutput;
 use Siberfx\RbacPermission\Exceptions\PermissionDenied;
 use Siberfx\RbacPermission\Facades\Rbac;
+use Siberfx\RbacPermission\Listeners\AuthorizeConsoleCommand;
 use Siberfx\RbacPermission\Tests\Fixtures\ClearCacheCommand;
+use Symfony\Component\Console\Input\StringInput;
+use Symfony\Component\Console\Output\BufferedOutput;
 
 beforeEach(function () {
     // Laravel only forwards Symfony command events in a real console run, not in
@@ -67,5 +70,5 @@ test('unattended runs are allowed only when explicitly enabled', function () {
 test('the console listener looks up only the command being run', function () {
     $this->artisan('rbac:matrix')->assertSuccessful();
 
-    expect(app()->bound(\Siberfx\RbacPermission\Listeners\AuthorizeConsoleCommand::ARTISAN))->toBeTrue();
+    expect(app()->bound(AuthorizeConsoleCommand::ARTISAN))->toBeTrue();
 });

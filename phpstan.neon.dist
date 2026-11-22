@@ -1,0 +1,18 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 5
+    paths:
+        - src
+        - database
+    tmpDir: build/phpstan
+
+    ignoreErrors:
+        # The traits are meant for the app's models and controllers; the package itself does not use them.
+        - identifier: trait.unused
+        # Package views live under the "rbac::" namespace, which Larastan cannot resolve.
+        -
+            identifier: argument.type
+            message: '#view-string#'
+            path: src/Http/Controllers/RbacAdminController.php

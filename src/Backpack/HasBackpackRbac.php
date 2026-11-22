@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Backpack;
 
 use Siberfx\RbacPermission\Concerns\HasRbac;

@@ -1,12 +1,25 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property int $id
+ * @property int $role_id
+ * @property string $permission
+ * @property string $scope
+ */
 class RoleGrant extends Model
 {
-    protected $guarded = [];
+    protected $fillable = ['role_id', 'permission', 'scope'];
+
+    protected function casts(): array
+    {
+        return ['role_id' => 'integer'];
+    }
 
     /**
      * rbac.connection, or the default connection.

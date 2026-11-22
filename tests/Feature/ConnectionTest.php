@@ -1,8 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Siberfx\RbacPermission\Facades\Rbac;
 use Siberfx\RbacPermission\Models\Role;
 

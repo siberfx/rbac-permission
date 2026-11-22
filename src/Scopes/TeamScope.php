@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Scopes;
 
 use Illuminate\Database\Eloquent\Model;

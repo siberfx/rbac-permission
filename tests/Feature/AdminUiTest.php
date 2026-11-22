@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 use Siberfx\RbacPermission\Facades\Rbac;
 use Siberfx\RbacPermission\Models\Role;
+use Siberfx\RbacPermission\Tests\Fixtures\User;
 
 beforeEach(function () {
     Rbac::sync(config('rbac.roles'));
@@ -107,7 +110,7 @@ test('an admin cannot assign a role at their own rank', function () {
 test('a tenant admin cannot view or change users of another tenant', function () {
     $admin = $this->makeUser(['name' => 'Admin', 'tenant_id' => 1]);
     Rbac::assign($admin, 'admin');
-    $outsider = \Siberfx\RbacPermission\Tests\Fixtures\User::create(['name' => 'Outsider', 'tenant_id' => 2]);
+    $outsider = User::create(['name' => 'Outsider', 'tenant_id' => 2]);
     Rbac::assign($outsider, 'staff');
 
     $this->actingAs($admin)->get("/rbac/users/{$outsider->getKey()}")->assertForbidden();

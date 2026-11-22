@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Support;
 
 use InvalidArgumentException;
@@ -17,7 +19,7 @@ final class Catalog
     private array $index = [];
 
     /**
-     * @param  array<string, array{label?: string, resources: array<string, list<string>>}>  $modules
+     * @param  array<string, array{label?: string, resources?: array<string, list<string>>}>  $modules
      * @param  list<string>  $verbs
      */
     public function __construct(
@@ -26,7 +28,7 @@ final class Catalog
     ) {}
 
     /**
-     * @return array<string, array{label: string, resources: array<string, list<string>>}>
+     * @return array<string, array{label?: string, resources?: array<string, list<string>>}>
      */
     public function modules(): array
     {

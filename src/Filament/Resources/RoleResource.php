@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Filament\Resources;
 
 use Filament\Actions\EditAction;
@@ -15,6 +17,7 @@ use Siberfx\RbacPermission\Filament\Resources\RoleResource\Pages\EditRole;
 use Siberfx\RbacPermission\Filament\Resources\RoleResource\Pages\ListRoles;
 use Siberfx\RbacPermission\Filament\Resources\RoleResource\RelationManagers\GrantsRelationManager;
 use Siberfx\RbacPermission\Models\Role;
+use UnitEnum;
 
 /**
  * Roles of every guard. Roles are created and their slugs set by rbac:sync, so the
@@ -26,7 +29,7 @@ class RoleResource extends Resource
 
     protected static ?string $model = Role::class;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Access control';
+    protected static string|UnitEnum|null $navigationGroup = 'Access control';
 
     protected static ?string $recordTitleAttribute = 'slug';
 
@@ -82,8 +85,9 @@ class RoleResource extends Resource
         $actor = static::rbacActor();
 
         return $actor !== null
+            && $record instanceof Role
             && Rbac::allows('admin.role.edit', null, $actor)
-            && Rbac::canAssign($actor, $record);
+            && Rbac::canEditRole($actor, $record);
     }
 
     public static function canCreate(): bool

@@ -1,15 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Listeners;
 
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Support\Facades\Artisan;
 use ReflectionClass;
-use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Command\LazyCommand;
 use Siberfx\RbacPermission\Attributes\RequiresPermission;
 use Siberfx\RbacPermission\Exceptions\PermissionDenied;
 use Siberfx\RbacPermission\Rbac;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Command\LazyCommand;
 
 /**
  * Enforces #[RequiresPermission] on console commands before they run.

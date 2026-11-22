@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Support\Carbon;
 use Siberfx\RbacPermission\Facades\Rbac;
 use Siberfx\RbacPermission\Models\UserGrant;
@@ -91,4 +93,18 @@ test('an expired grant stops applying while the grant cache is on', function () 
 
     expect(Rbac::allows('billing.invoice.edit', null, $user))->toBeFalse()
         ->and(Rbac::allows('billing.invoice.show', null, $user))->toBeFalse();
+});
+
+test('rbac:prune-expired deletes expired assignments and grants', function () {
+    $user = $this->makeUser(['name' => 'Jane']);
+    Rbac::assign($user, 'staff', null, Carbon::now()->subMinute());
+    Rbac::allow($user, 'billing.invoice.edit@own', Carbon::now()->subMinute());
+    Rbac::deny($user, 'billing.invoice.delete@own', Carbon::now()->addDay());
+
+    $this->artisan('rbac:prune-expired')
+        ->expectsOutputToContain('Removed 2 expired row(s).')
+        ->assertSuccessful();
+
+    expect(UserGrant::query()->count())->toBe(1)
+        ->and($user->roles()->count())->toBe(0);
 });

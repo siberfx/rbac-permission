@@ -1,11 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Tests;
 
+use Backpack\Basset\BassetServiceProvider;
+use Backpack\CRUD\BackpackServiceProvider;
+use Filament\FilamentServiceProvider;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Schema;
+use Livewire\LivewireServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Siberfx\RbacPermission\RbacPermissionServiceProvider;
 use Siberfx\RbacPermission\Tests\Fixtures\Admin;
@@ -23,10 +29,10 @@ abstract class TestCase extends Orchestra
     {
         return [
             RbacPermissionServiceProvider::class,
-            \Livewire\LivewireServiceProvider::class,
-            \Filament\FilamentServiceProvider::class,
-            \Backpack\Basset\BassetServiceProvider::class,
-            \Backpack\CRUD\BackpackServiceProvider::class,
+            LivewireServiceProvider::class,
+            FilamentServiceProvider::class,
+            BassetServiceProvider::class,
+            BackpackServiceProvider::class,
         ];
     }
 

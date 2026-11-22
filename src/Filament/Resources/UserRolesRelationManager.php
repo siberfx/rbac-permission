@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Filament\Resources;
 
 use Filament\Actions\Action;
@@ -7,11 +9,11 @@ use Filament\Actions\CreateAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Siberfx\RbacPermission\Facades\Rbac;
 use Siberfx\RbacPermission\Filament\Concerns\ChecksRbacAccess;
 use Siberfx\RbacPermission\Filament\Support\Operations;
 use Siberfx\RbacPermission\Models\Role;
@@ -54,7 +56,7 @@ class UserRolesRelationManager extends RelationManager
                         Select::make('role')
                             ->label('Role')
                             ->options(fn (): array => Role::query()
-                                ->where('guard', $this->getOwnerRecord()->rbacGuard())
+                                ->where('guard', Rbac::guardOf($this->getOwnerRecord()))
                                 ->orderByDesc('rank')
                                 ->pluck('slug', 'slug')
                                 ->all())
@@ -69,7 +71,7 @@ class UserRolesRelationManager extends RelationManager
                         Operations::assignRole(static::requireRbacActor(), $this->getOwnerRecord(), (string) $data['role'], $expiresAt);
 
                         return Role::query()
-                            ->where('guard', $this->getOwnerRecord()->rbacGuard())
+                            ->where('guard', Rbac::guardOf($this->getOwnerRecord()))
                             ->where('slug', $data['role'])
                             ->firstOrFail();
                     }),

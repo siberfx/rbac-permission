@@ -1,0 +1,25 @@
+{
+    "preset": "laravel",
+    "rules": {
+        "declare_strict_types": true,
+        "fully_qualified_strict_types": {
+            "import_symbols": true,
+            "leading_backslash_in_global_namespace": false,
+            "phpdoc_tags": ["method", "param", "property", "property-read", "return", "see", "throws", "var"]
+        },
+        "global_namespace_import": {
+            "import_classes": true,
+            "import_constants": false,
+            "import_functions": false
+        },
+        "ordered_imports": {
+            "sort_algorithm": "alpha",
+            "imports_order": ["class", "function", "const"]
+        },
+        "no_unused_imports": true
+    },
+    "exclude": [
+        "build",
+        "vendor"
+    ]
+}

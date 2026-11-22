@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Support\Facades\DB;
 use Siberfx\RbacPermission\Facades\Rbac;
 use Siberfx\RbacPermission\Rbac as RbacService;

@@ -1,8 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 use Siberfx\RbacPermission\Facades\Rbac;
 use Siberfx\RbacPermission\Models\Role;
 use Siberfx\RbacPermission\Tests\Fixtures\Admin;
+use Siberfx\RbacPermission\Tests\Fixtures\User;
 
 beforeEach(function () {
     config(['rbac.guards' => [
@@ -82,7 +85,7 @@ test('rbac:matrix can show the roles of one guard', function () {
 });
 
 test('the user model is resolved from the guard', function () {
-    expect(Rbac::userModel())->toBe(\Siberfx\RbacPermission\Tests\Fixtures\User::class)
+    expect(Rbac::userModel())->toBe(User::class)
         ->and(Rbac::userModel('admin'))->toBe(Admin::class);
 });
 

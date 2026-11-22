@@ -1,14 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
+use Siberfx\RbacPermission\Console\Concerns\FindsModels;
 use Siberfx\RbacPermission\Exceptions\RoleAssignmentDenied;
 use Siberfx\RbacPermission\Rbac;
 
 class AssignCommand extends Command
 {
+    use FindsModels;
+
     protected $signature = 'rbac:assign
         {role : Role slug}
         {user : User id}
@@ -22,11 +27,9 @@ class AssignCommand extends Command
     public function handle(Rbac $rbac): int
     {
         $userClass = $this->option('model') ?: $rbac->userModel($this->option('guard') ?: null);
-        $user = $userClass::query()->find($this->argument('user'));
+        $user = $this->findModel($userClass, $this->argument('user'), 'User');
 
         if ($user === null) {
-            $this->error('User not found.');
-
             return self::FAILURE;
         }
 

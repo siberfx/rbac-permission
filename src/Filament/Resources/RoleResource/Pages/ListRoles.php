@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Filament\Resources\RoleResource\Pages;
 
 use Filament\Resources\Pages\ListRecords;

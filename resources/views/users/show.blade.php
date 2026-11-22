@@ -4,7 +4,7 @@
 @section('title', 'User '.$user->getKey())
 
 @section('content')
-    <h1>User {{ $user->getKey() }} <span class="muted">({{ $user->rbacGuard() }})</span></h1>
+    <h1>User {{ $user->getKey() }} <span class="muted">({{ $userGuard }})</span></h1>
 
     <table>
         <thead>

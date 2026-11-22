@@ -1,15 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 use Filament\Panel;
 use Filament\PanelRegistry;
 use Illuminate\Validation\ValidationException;
 use Siberfx\RbacPermission\Exceptions\PermissionDenied;
 use Siberfx\RbacPermission\Facades\Rbac;
-use Siberfx\RbacPermission\Filament\Resources\RoleResource;
 use Siberfx\RbacPermission\Filament\RbacPlugin;
+use Siberfx\RbacPermission\Filament\Resources\RoleResource;
+use Siberfx\RbacPermission\Filament\Resources\UserRolesRelationManager;
 use Siberfx\RbacPermission\Filament\Support\Operations;
 use Siberfx\RbacPermission\Models\Role;
 use Siberfx\RbacPermission\Models\RoleGrant;
+use Siberfx\RbacPermission\Tests\Fixtures\User;
 
 beforeEach(function () {
     app(PanelRegistry::class)->register(Panel::make()->id('admin')->default()->plugin(RbacPlugin::make()));
@@ -124,11 +128,11 @@ test('assigning a role from the user screen follows the rank rules', function ()
 test('the user roles screen is limited to users the actor reaches', function () {
     $admin = $this->makeUser(['name' => 'Admin', 'tenant_id' => 1]);
     Rbac::assign($admin, 'admin');
-    $outsider = \Siberfx\RbacPermission\Tests\Fixtures\User::create(['name' => 'Outsider', 'tenant_id' => 2]);
+    $outsider = User::create(['name' => 'Outsider', 'tenant_id' => 2]);
 
     $this->actingAs($admin);
 
-    expect(\Siberfx\RbacPermission\Filament\Resources\UserRolesRelationManager::canViewForRecord($outsider, 'x'))->toBeFalse()
+    expect(UserRolesRelationManager::canViewForRecord($outsider, 'x'))->toBeFalse()
         ->and(fn () => Operations::assignRole($admin, $outsider, 'manager'))->toThrow(PermissionDenied::class)
         ->and(fn () => Operations::unassignRole($admin, $outsider, 'manager'))->toThrow(PermissionDenied::class)
         ->and($outsider->refresh()->hasRole('manager'))->toBeFalse();

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Exceptions;
 
 use Illuminate\Auth\Access\AuthorizationException;

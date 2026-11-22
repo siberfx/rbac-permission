@@ -1,7 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
+use Illuminate\Database\Eloquent\Model;
+use Siberfx\RbacPermission\Exceptions\InvalidPermission;
 use Siberfx\RbacPermission\Exceptions\PermissionDenied;
 use Siberfx\RbacPermission\Facades\Rbac;
+use Siberfx\RbacPermission\Scopes\ScopeContract;
+use Siberfx\RbacPermission\Scopes\ScopeRegistry;
+use Siberfx\RbacPermission\Tests\Fixtures\EverywhereScope;
 use Siberfx\RbacPermission\Tests\Fixtures\Invoice;
 
 beforeEach(function () {
@@ -67,7 +74,7 @@ test('a direct deny overrides a broader role grant', function () {
     $jane->denyPermission('billing.invoice.delete@own');
 
     expect(Rbac::allows('billing.invoice.delete', $this->invoice, $jane))->toBeFalse()
-        ->and(Rbac::decide('billing.invoice.delete', $this->invoice, $jane))->toBe(\Siberfx\RbacPermission\Rbac::DENY);
+        ->and(Rbac::decide('billing.invoice.delete', $this->invoice, $jane))->toBe(Siberfx\RbacPermission\Rbac::DENY);
 });
 
 test('without a subject an own deny does not hide the whole action', function () {
@@ -88,11 +95,11 @@ test('enforce throws a 403 PermissionDenied when nothing matches', function () {
 
 test('a permission outside the catalog is rejected at check time', function () {
     Rbac::allows('billing.invoice.fly', null, $this->jane);
-})->throws(\Siberfx\RbacPermission\Exceptions\InvalidPermission::class);
+})->throws(InvalidPermission::class);
 
 test('a grant that matches nothing in the catalog is rejected', function () {
     Rbac::grant('staff', 'billing.invoice.fly@own');
-})->throws(\Siberfx\RbacPermission\Exceptions\InvalidPermission::class);
+})->throws(InvalidPermission::class);
 
 test('explain reports the decision and the grant that covered the subject', function () {
     Rbac::role('manager');
@@ -112,7 +119,7 @@ test('explain reports the decision and the grant that covered the subject', func
 
 test('a custom scope can be registered and used in a grant', function () {
     config(['rbac.scopes.region' => ['level' => 25, 'resolver' => RegionScopeFixture::class]]);
-    app(\Siberfx\RbacPermission\Scopes\ScopeRegistry::class)
+    app(ScopeRegistry::class)
         ->register('region', RegionScopeFixture::class, 25);
 
     Rbac::role('regional');
@@ -123,14 +130,14 @@ test('a custom scope can be registered and used in a grant', function () {
 });
 
 // Minimal custom scope: everything with amount under 1000 is "in region".
-class RegionScopeFixture implements \Siberfx\RbacPermission\Scopes\ScopeContract
+class RegionScopeFixture implements ScopeContract
 {
-    public function covers(\Illuminate\Database\Eloquent\Model $user, \Illuminate\Database\Eloquent\Model $subject): bool
+    public function covers(Model $user, Model $subject): bool
     {
         return (int) $subject->getAttribute('amount') < 1000;
     }
 
-    public function constrain($query, \Illuminate\Database\Eloquent\Model $user, \Illuminate\Database\Eloquent\Model $model): void
+    public function constrain($query, Model $user, Model $model): void
     {
         $query->where($model->qualifyColumn('amount'), '<', 1000);
     }
@@ -138,7 +145,7 @@ class RegionScopeFixture implements \Siberfx\RbacPermission\Scopes\ScopeContract
 
 describe('an unrestricted scope under another name', function () {
     beforeEach(function () {
-        Rbac::scopes()->register('everywhere', \Siberfx\RbacPermission\Tests\Fixtures\EverywhereScope::class, 100);
+        Rbac::scopes()->register('everywhere', EverywhereScope::class, 100);
         $this->user = $this->makeUser(['name' => 'Jane']);
         $this->invoice = $this->makeInvoice(['user_id' => 999, 'team_id' => 99, 'tenant_id' => 9]);
     });
@@ -148,13 +155,13 @@ describe('an unrestricted scope under another name', function () {
         Rbac::deny($this->user, 'billing.invoice.show@everywhere');
 
         expect(Rbac::decide('billing.invoice.show', null, $this->user))->toBe('deny')
-            ->and(Rbac::constrain(\Siberfx\RbacPermission\Tests\Fixtures\Invoice::query(), 'billing.invoice.show', $this->user)->count())->toBe(0);
+            ->and(Rbac::constrain(Invoice::query(), 'billing.invoice.show', $this->user)->count())->toBe(0);
     });
 
     test('its allow reaches every row without a filter', function () {
         Rbac::allow($this->user, 'billing.invoice.show@everywhere');
 
-        expect(Rbac::constrain(\Siberfx\RbacPermission\Tests\Fixtures\Invoice::query(), 'billing.invoice.show', $this->user)->count())
-            ->toBe(\Siberfx\RbacPermission\Tests\Fixtures\Invoice::query()->count());
+        expect(Rbac::constrain(Invoice::query(), 'billing.invoice.show', $this->user)->count())
+            ->toBe(Invoice::query()->count());
     });
 });

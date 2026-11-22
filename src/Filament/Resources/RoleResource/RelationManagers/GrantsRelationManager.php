@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Filament\Resources\RoleResource\RelationManagers;
 
 use Filament\Actions\CreateAction;
@@ -11,8 +13,10 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
+use LogicException;
 use Siberfx\RbacPermission\Filament\Concerns\ChecksRbacAccess;
 use Siberfx\RbacPermission\Filament\Support\Operations;
+use Siberfx\RbacPermission\Models\Role;
 use Siberfx\RbacPermission\Models\RoleGrant;
 
 /**
@@ -62,7 +66,7 @@ class GrantsRelationManager extends RelationManager
                     ->visible(fn (): bool => static::rbacAllows('admin.role.edit'))
                     ->using(fn (array $data): RoleGrant => Operations::grant(
                         static::requireRbacActor(),
-                        $this->getOwnerRecord(),
+                        $this->ownerRole(),
                         (string) $data['permission'],
                         (string) $data['scope'],
                     )),
@@ -72,9 +76,16 @@ class GrantsRelationManager extends RelationManager
                     ->visible(fn (): bool => static::rbacAllows('admin.role.edit'))
                     ->action(fn (RoleGrant $record) => Operations::revoke(
                         static::requireRbacActor(),
-                        $this->getOwnerRecord(),
+                        $this->ownerRole(),
                         $record,
                     )),
             ]);
+    }
+
+    private function ownerRole(): Role
+    {
+        $role = $this->getOwnerRecord();
+
+        return $role instanceof Role ? $role : throw new LogicException('The grants relation manager belongs on a role.');
     }
 }

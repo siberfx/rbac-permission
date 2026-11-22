@@ -1,8 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Scopes;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 
 /**
  * Optional for a scope: how to remove its rows from a query when it is denied.
@@ -14,7 +18,7 @@ use Illuminate\Database\Eloquent\Model;
 interface ExcludesRows
 {
     /**
-     * @param  \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder  $query
+     * @param  Builder<Model>|QueryBuilder  $query
      */
     public function exclude($query, Model $user, Model $model): void;
 }

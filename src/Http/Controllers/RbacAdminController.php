@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Http\Controllers;
 
 use Illuminate\Auth\AuthenticationException;
@@ -88,8 +90,9 @@ final class RbacAdminController extends Controller
         return view('rbac::users.show', [
             'user' => $user,
             'guard' => $this->guard($request),
-            'assigned' => $user->roles()->orderBy('slug')->get(),
-            'available' => Role::query()->where('guard', $user->rbacGuard())->orderByDesc('rank')->orderBy('slug')->get(),
+            'userGuard' => $this->rbac->guardOf($user),
+            'assigned' => $this->rbac->rolesOf($user)->orderBy('slug')->get(),
+            'available' => Role::query()->where('guard', $this->rbac->guardOf($user))->orderByDesc('rank')->orderBy('slug')->get(),
         ]);
     }
 

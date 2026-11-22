@@ -1,5 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
+use Carbon\CarbonInterface;
+use Siberfx\RbacPermission\Exceptions\InvalidPermission;
 use Siberfx\RbacPermission\Facades\Rbac;
 use Siberfx\RbacPermission\Models\Role;
 
@@ -21,7 +25,7 @@ test('sync validates every grant before writing anything', function () {
     $before = Role::query()->count();
 
     expect(fn () => Rbac::sync(['broken' => ['billing.invoice.fly@own']]))
-        ->toThrow(\Siberfx\RbacPermission\Exceptions\InvalidPermission::class);
+        ->toThrow(InvalidPermission::class);
 
     expect(Role::query()->count())->toBe($before);
 });
@@ -96,4 +100,14 @@ test('sync ignores a grant listed twice', function () {
 
     expect($stats)->toMatchArray(['grants' => 1, 'added' => 1])
         ->and(Role::query()->where('slug', 'manager')->firstOrFail()->grants()->count())->toBe(1);
+});
+
+test('the models cast their columns', function () {
+    $role = Rbac::role('auditor', rank: 30);
+    $grant = Rbac::allow($this->makeUser(['name' => 'Jane']), 'billing.invoice.show@own', now()->addDay());
+
+    expect($role->refresh()->rank)->toBe(30)
+        ->and($grant->refresh()->expires_at)->toBeInstanceOf(CarbonInterface::class)
+        ->and((new Role)->isFillable('id'))->toBeFalse()
+        ->and((new Role)->isFillable('rank'))->toBeTrue();
 });

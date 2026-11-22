@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Support;
 
 use Siberfx\RbacPermission\Exceptions\InvalidPermission;
@@ -8,8 +10,10 @@ use Siberfx\RbacPermission\Exceptions\InvalidPermission;
  * The permission grammar:   module.resource.verb[@scope]
  *
  *   billing.invoice.edit@team   one permission, reaching team scope
+ *
  *   billing.invoice.*@tenant    every invoice verb, across the tenant
  *   billing.*                   every billing permission (trailing wildcard)
+ *
  *   *@global                    everything
  */
 final class PermissionKey

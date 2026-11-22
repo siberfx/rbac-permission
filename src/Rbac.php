@@ -7,6 +7,7 @@ use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -28,11 +29,11 @@ use Siberfx\RbacPermission\Support\PermissionKey;
 
 final class Rbac
 {
-    public const ALLOW = 'allow';
+    public const string ALLOW = 'allow';
 
-    public const DENY = 'deny';
+    public const string DENY = 'deny';
 
-    public const NONE = 'none';
+    public const string NONE = 'none';
 
     /** @var array<string, list<Grant>> */
     private array $memo = [];
@@ -157,7 +158,7 @@ final class Rbac
             $rows[] = [
                 'grant' => $grant->label(),
                 'source' => $grant->source,
-                'covers' => $user ? $this->covers($grant, $user, $subject) : false,
+                'covers' => $this->covers($grant, $user, $subject),
             ];
         }
 
@@ -326,7 +327,7 @@ final class Rbac
             ->join($this->table('roles').' as r', 'r.id', '=', 'a.role_id')
             ->where('a.model_type', $user->getMorphClass())
             ->where('a.model_id', (string) $user->getKey())
-            ->where('r.guard', $this->guardFor($user)), 'a.expires_at')
+            ->where('r.guard', $this->guardOf($user)), 'a.expires_at')
             ->max('r.rank');
 
         return $rank === null ? null : (int) $rank;
@@ -338,7 +339,7 @@ final class Rbac
      */
     public function canAssign(Model $actor, Role|string $role): bool
     {
-        $role = $role instanceof Role ? $role : $this->findRole($role, $this->guardFor($actor));
+        $role = $role instanceof Role ? $role : $this->findRole($role, $this->guardOf($actor));
         $rank = $this->rankOf($actor);
 
         return $rank !== null && $rank > (int) $role->rank;
@@ -394,7 +395,7 @@ final class Rbac
      */
     public function assign(Model $user, Role|string $role, ?Model $by = null, ?DateTimeInterface $expiresAt = null): void
     {
-        $role = $role instanceof Role ? $role : $this->findRole($role, $this->guardFor($user));
+        $role = $role instanceof Role ? $role : $this->findRole($role, $this->guardOf($user));
         $this->assertCanManage($by, $role);
 
         $table = $this->db()->table($this->table('role_assignments'));
@@ -418,7 +419,7 @@ final class Rbac
 
     public function unassign(Model $user, Role|string $role, ?Model $by = null): int
     {
-        $role = $role instanceof Role ? $role : $this->findRole($role, $this->guardFor($user));
+        $role = $role instanceof Role ? $role : $this->findRole($role, $this->guardOf($user));
         $this->assertCanManage($by, $role);
 
         $deleted = $this->db()->table($this->table('role_assignments'))
@@ -767,7 +768,7 @@ final class Rbac
             ->join($this->table('role_grants').' as g', 'g.role_id', '=', 'a.role_id')
             ->where('a.model_type', $morph)
             ->where('a.model_id', $id)
-            ->where('r.guard', $this->guardFor($user)), 'a.expires_at')
+            ->where('r.guard', $this->guardOf($user)), 'a.expires_at')
             ->get(['r.slug as role', 'g.permission', 'g.scope', 'a.expires_at']);
 
         $direct = $this->whereActive($connection->table($this->table('user_grants'))
@@ -858,9 +859,21 @@ final class Rbac
     /**
      * The guard a user model authenticates with. Models that define rbacGuard() (the HasRbac trait does) choose their own.
      */
-    private function guardFor(Model $user): string
+    public function guardOf(Model $user): string
     {
         return method_exists($user, 'rbacGuard') ? (string) $user->rbacGuard() : $this->defaultGuard();
+    }
+
+    /**
+     * The user's role assignments as a relation, with expires_at on the pivot.
+     * Works for any user model; HasRbac::roles() returns the same relation.
+     *
+     * @return MorphToMany<Role, Model>
+     */
+    public function rolesOf(Model $user): MorphToMany
+    {
+        return $user->morphToMany(Role::class, 'model', $this->table('role_assignments'), 'model_id', 'role_id')
+            ->withPivot('expires_at');
     }
 
     private function defaultGuard(): string

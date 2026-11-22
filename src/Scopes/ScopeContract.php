@@ -1,9 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Scopes;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 
 /**
  * A scope answers two questions for a grant:
@@ -17,7 +20,7 @@ interface ScopeContract
     public function covers(Model $user, Model $subject): bool;
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder  $query
+     * @param  Builder<Model>|QueryBuilder  $query
      */
     public function constrain($query, Model $user, Model $model): void;
 }

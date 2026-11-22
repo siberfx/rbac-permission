@@ -6,6 +6,31 @@ on:
   pull_request:
 
 jobs:
+  quality:
+    runs-on: ubuntu-latest
+
+    name: Coding standards and static analysis
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pdo, sqlite, pdo_sqlite, intl, fileinfo
+          coverage: none
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction
+
+      - name: Coding standards (Pint, incl. imports and strict_types)
+        run: vendor/bin/pint --test
+
+      - name: Static analysis (Larastan)
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+
   test:
     runs-on: ubuntu-latest
     strategy:

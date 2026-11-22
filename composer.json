@@ -16,7 +16,7 @@
     "license": "MIT",
     "authors": [
         {
-            "name": "Selim Gormus",
+            "name": "Selim Görmüş",
             "email": "info@siberfx.com",
             "role": "Lead Software Engineer"
         }
@@ -37,6 +37,8 @@
     "require-dev": {
         "backpack/crud": "^7.0.47",
         "filament/filament": "^5.8.3",
+        "larastan/larastan": "^3.15",
+        "laravel/pint": "^1.32",
         "orchestra/testbench": "^10.0 || ^11.0",
         "pestphp/pest": "^3.8 || ^4.0",
         "pestphp/pest-plugin-laravel": "^3.2 || ^4.0"
@@ -56,7 +58,15 @@
         }
     },
     "scripts": {
-        "test": "pest"
+        "test": "pest",
+        "format": "pint",
+        "lint": "pint --test",
+        "analyse": "phpstan analyse --memory-limit=1G",
+        "check": [
+            "@lint",
+            "@analyse",
+            "@test"
+        ]
     },
     "config": {
         "sort-packages": true,

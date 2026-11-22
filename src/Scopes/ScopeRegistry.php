@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Scopes;
 
 use InvalidArgumentException;
@@ -17,7 +19,7 @@ final class ScopeRegistry
     private array $instances = [];
 
     /**
-     * @param  array<string, array{level: int, resolver: class-string<ScopeContract>}>  $scopes
+     * @param  array<string, array{level: int, resolver: string}>  $scopes
      */
     public function __construct(array $scopes = [])
     {
@@ -27,7 +29,7 @@ final class ScopeRegistry
     }
 
     /**
-     * @param  class-string<ScopeContract>  $resolver
+     * @param  string  $resolver  a class implementing ScopeContract (checked)
      */
     public function register(string $name, string $resolver, int $level): void
     {

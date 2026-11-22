@@ -4,6 +4,28 @@ All notable changes to `siberfx/rbac-permission` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.8.3] - 2026-11-22
+
+### Added
+
+- `php artisan rbac:prune-expired`: deletes role assignments and direct grants whose expiry has passed. Schedule it daily to keep the tables small.
+- `Rbac::rolesOf($user)` and `Rbac::guardOf($user)`: a user's role relation and guard for any user model, with or without `HasRbac`. `HasRbac::roles()` now returns `Rbac::rolesOf()`.
+- Coding standards with Pint (`pint.json`): the Laravel preset, plus imported classes instead of inline fully qualified names (also in docblocks), sorted imports, no unused imports, and `declare(strict_types=1);` in every PHP file.
+- Static analysis with Larastan at level 5 (`phpstan.neon.dist`).
+- A CI job runs both. Composer scripts: `composer lint`, `composer format`, `composer analyse`, and `composer check` for everything plus the tests.
+
+### Changed
+
+- Every PHP file now declares `strict_types`. Arguments passed to the package keep working. The declaration only affects calls made inside the package's own files.
+- The models use `$fillable` instead of `$guarded = []`, cast `rank`, `role_id` and `expires_at` (now a `Carbon` instance on `UserGrant`), and document their properties.
+- `rbac:assign` and `rbac:explain` check that `--model` / `--on-model` name an Eloquent model class, and say so when they do not.
+- The admin user page and the Filament user roles screen no longer require the user model to use `HasRbac`.
+
+### Fixed
+
+- The Filament role edit check now uses `Rbac::canEditRole()` and accepts only `Role` records.
+- The commands table in the README was split by a misplaced paragraph.
+
 ## [1.8.2] - 2026-11-22
 
 ### Fixed

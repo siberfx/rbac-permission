@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Filament;
 
 use Filament\Contracts\Plugin;
@@ -18,7 +20,7 @@ final class RbacPlugin implements Plugin
 {
     public static function make(): static
     {
-        return new static;
+        return new self;
     }
 
     public function getId(): string

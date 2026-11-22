@@ -1,41 +1,54 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Facades;
 
+use DateTimeInterface;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Facades\Facade;
+use Siberfx\RbacPermission\Models\Role;
+use Siberfx\RbacPermission\Models\RoleGrant;
+use Siberfx\RbacPermission\Models\UserGrant;
 use Siberfx\RbacPermission\Rbac as RbacService;
+use Siberfx\RbacPermission\Scopes\ScopeRegistry;
+use Siberfx\RbacPermission\Support\Catalog;
 
 /**
- * @method static bool allows(string $permission, mixed $subject = null, ?\Illuminate\Database\Eloquent\Model $user = null)
- * @method static bool denies(string $permission, mixed $subject = null, ?\Illuminate\Database\Eloquent\Model $user = null)
- * @method static void enforce(string $permission, mixed $subject = null, ?\Illuminate\Database\Eloquent\Model $user = null)
- * @method static string decide(string $permission, mixed $subject = null, ?\Illuminate\Database\Eloquent\Model $user = null)
- * @method static array explain(string $permission, mixed $subject = null, ?\Illuminate\Database\Eloquent\Model $user = null)
+ * @method static bool allows(string $permission, mixed $subject = null, ?Model $user = null)
+ * @method static bool denies(string $permission, mixed $subject = null, ?Model $user = null)
+ * @method static void enforce(string $permission, mixed $subject = null, ?Model $user = null)
+ * @method static string decide(string $permission, mixed $subject = null, ?Model $user = null)
+ * @method static array explain(string $permission, mixed $subject = null, ?Model $user = null)
  * @method static ?bool gate(string $ability, mixed $user, array $arguments = [])
- * @method static ?string widestScope(string $permission, ?\Illuminate\Database\Eloquent\Model $user = null)
- * @method static bool canGrant(\Illuminate\Database\Eloquent\Model $actor, string $input)
- * @method static bool canAssign(\Illuminate\Database\Eloquent\Model $actor, \Siberfx\RbacPermission\Models\Role|string $role)
- * @method static bool canEditRole(\Illuminate\Database\Eloquent\Model $actor, \Siberfx\RbacPermission\Models\Role $role)
- * @method static ?int rankOf(\Illuminate\Database\Eloquent\Model $user)
- * @method static \Illuminate\Database\Eloquent\Builder constrain(\Illuminate\Database\Eloquent\Builder $query, string $permission, ?\Illuminate\Database\Eloquent\Model $user = null)
- * @method static \Siberfx\RbacPermission\Models\Role role(string $slug, ?string $name = null, ?string $description = null, ?int $rank = null, ?string $guard = null)
- * @method static \Siberfx\RbacPermission\Models\RoleGrant grant(\Siberfx\RbacPermission\Models\Role|string $role, string $permission, ?string $guard = null)
- * @method static int revoke(\Siberfx\RbacPermission\Models\Role|string $role, string $permission, ?string $guard = null)
- * @method static void assign(\Illuminate\Database\Eloquent\Model $user, \Siberfx\RbacPermission\Models\Role|string $role, ?\Illuminate\Database\Eloquent\Model $by = null, ?\DateTimeInterface $expiresAt = null)
- * @method static int unassign(\Illuminate\Database\Eloquent\Model $user, \Siberfx\RbacPermission\Models\Role|string $role, ?\Illuminate\Database\Eloquent\Model $by = null)
- * @method static \Siberfx\RbacPermission\Models\UserGrant allow(\Illuminate\Database\Eloquent\Model $user, string $permission, ?\DateTimeInterface $expiresAt = null)
- * @method static \Siberfx\RbacPermission\Models\UserGrant deny(\Illuminate\Database\Eloquent\Model $user, string $permission, ?\DateTimeInterface $expiresAt = null)
- * @method static int withdraw(\Illuminate\Database\Eloquent\Model $user, string $permission)
+ * @method static ?string widestScope(string $permission, ?Model $user = null)
+ * @method static bool canGrant(Model $actor, string $input)
+ * @method static bool canAssign(Model $actor, Role|string $role)
+ * @method static bool canEditRole(Model $actor, Role $role)
+ * @method static ?int rankOf(Model $user)
+ * @method static Builder constrain(Builder $query, string $permission, ?Model $user = null)
+ * @method static Role role(string $slug, ?string $name = null, ?string $description = null, ?int $rank = null, ?string $guard = null)
+ * @method static RoleGrant grant(Role|string $role, string $permission, ?string $guard = null)
+ * @method static int revoke(Role|string $role, string $permission, ?string $guard = null)
+ * @method static void assign(Model $user, Role|string $role, ?Model $by = null, ?DateTimeInterface $expiresAt = null)
+ * @method static int unassign(Model $user, Role|string $role, ?Model $by = null)
+ * @method static UserGrant allow(Model $user, string $permission, ?DateTimeInterface $expiresAt = null)
+ * @method static UserGrant deny(Model $user, string $permission, ?DateTimeInterface $expiresAt = null)
+ * @method static int withdraw(Model $user, string $permission)
  * @method static int pruneExpired()
  * @method static array sync(array $definitions, bool $prune = false, ?string $guard = null)
  * @method static array matrix(?string $guard = null)
- * @method static ?\Illuminate\Database\Eloquent\Model consoleActor()
+ * @method static ?Model consoleActor()
  * @method static string userModel(?string $guard = null)
- * @method static \Siberfx\RbacPermission\Support\Catalog catalog()
- * @method static \Siberfx\RbacPermission\Scopes\ScopeRegistry scopes()
+ * @method static string guardOf(Model $user)
+ * @method static MorphToMany rolesOf(Model $user)
+ * @method static Catalog catalog()
+ * @method static ScopeRegistry scopes()
  * @method static void flush()
  *
- * @see \Siberfx\RbacPermission\Rbac
+ * @see RbacService
  */
 class Rbac extends Facade
 {

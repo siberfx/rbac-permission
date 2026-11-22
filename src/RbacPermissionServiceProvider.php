@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission;
 
 use Illuminate\Console\Application as ArtisanApplication;
@@ -12,6 +14,7 @@ use Siberfx\RbacPermission\Console\AssignCommand;
 use Siberfx\RbacPermission\Console\ExplainCommand;
 use Siberfx\RbacPermission\Console\GrantCommand;
 use Siberfx\RbacPermission\Console\MatrixCommand;
+use Siberfx\RbacPermission\Console\PruneExpiredCommand;
 use Siberfx\RbacPermission\Console\SyncCommand;
 use Siberfx\RbacPermission\Events\RbacChanged;
 use Siberfx\RbacPermission\Http\Middleware\EnsurePermission;
@@ -74,7 +77,9 @@ class RbacPermissionServiceProvider extends ServiceProvider
         Event::listen(CommandStarting::class, AuthorizeConsoleCommand::class);
 
         // Keep the Artisan application, so the listener can load just the running command.
-        ArtisanApplication::starting(fn (ArtisanApplication $artisan) => $this->app->instance(AuthorizeConsoleCommand::ARTISAN, $artisan));
+        ArtisanApplication::starting(function (ArtisanApplication $artisan): void {
+            $this->app->instance(AuthorizeConsoleCommand::ARTISAN, $artisan);
+        });
         Event::listen(RbacChanged::class, WriteAuditLog::class);
 
         if ($this->app->runningInConsole()) {
@@ -84,6 +89,7 @@ class RbacPermissionServiceProvider extends ServiceProvider
                 ExplainCommand::class,
                 AssignCommand::class,
                 GrantCommand::class,
+                PruneExpiredCommand::class,
             ]);
         }
     }

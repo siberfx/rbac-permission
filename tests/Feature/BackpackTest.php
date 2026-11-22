@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Backpack\CRUD\app\Library\CrudPanel\CrudPanel;
 use Siberfx\RbacPermission\Backpack\Access;
 use Siberfx\RbacPermission\Backpack\HasRbacAccess;

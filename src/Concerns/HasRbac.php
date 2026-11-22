@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Concerns;
 
 use DateTimeInterface;
@@ -22,10 +24,12 @@ trait HasRbac
         return (string) config('auth.defaults.guard', 'web');
     }
 
+    /**
+     * @return MorphToMany<Role, $this>
+     */
     public function roles(): MorphToMany
     {
-        return $this->morphToMany(Role::class, 'model', config('rbac.tables.role_assignments'), 'model_id', 'role_id')
-            ->withPivot('expires_at');
+        return app(Rbac::class)->rolesOf($this);
     }
 
     /**

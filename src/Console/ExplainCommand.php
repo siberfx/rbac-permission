@@ -1,12 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission\Console;
 
 use Illuminate\Console\Command;
+use Siberfx\RbacPermission\Console\Concerns\FindsModels;
 use Siberfx\RbacPermission\Rbac;
 
 class ExplainCommand extends Command
 {
+    use FindsModels;
+
     protected $signature = 'rbac:explain
         {permission : Permission key, e.g. billing.invoice.edit}
         {user : User id}
@@ -20,11 +25,9 @@ class ExplainCommand extends Command
     public function handle(Rbac $rbac): int
     {
         $userClass = $this->option('model') ?: $rbac->userModel($this->option('guard') ?: null);
-        $user = $userClass::query()->find($this->argument('user'));
+        $user = $this->findModel($userClass, $this->argument('user'), 'User');
 
         if ($user === null) {
-            $this->error('User not found.');
-
             return self::FAILURE;
         }
 
@@ -32,11 +35,9 @@ class ExplainCommand extends Command
         $subjectClass = $this->option('on-model');
 
         if ($subjectClass && $this->option('on') !== null) {
-            $subject = $subjectClass::query()->find($this->option('on'));
+            $subject = $this->findModel($subjectClass, $this->option('on'), 'Subject');
 
             if ($subject === null) {
-                $this->error('Subject not found.');
-
                 return self::FAILURE;
             }
         }
