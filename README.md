@@ -278,6 +278,20 @@ public function approve(Refund $refund): void
 }
 ```
 
+To branch on the outcome, `Rbac::decision()` returns a `Decision` enum:
+
+```php
+use Siberfx\RbacPermission\Enums\Decision;
+
+match (Rbac::decision('billing.refund.approve', $refund)) {
+    Decision::Allow => $this->approve($refund),
+    Decision::Deny => abort(403, 'Approving refunds is blocked for you.'),   // an explicit deny
+    Decision::None => abort(403),                                           // no grant at all
+};
+```
+
+`Rbac::decide()` returns the same result as a string (`'allow'`, `'deny'` or `'none'`).
+
 ### Lists and exports
 
 ```php
@@ -286,7 +300,37 @@ $invoices = Rbac::constrain(Invoice::query(), 'billing.invoice.show')
     ->paginate();
 ```
 
+On a model that uses `HasRbacScopes`, the same filter is available as a query scope:
+
+```php
+$invoices = Invoice::query()->whereRbac('billing.invoice.show')->latest()->paginate();
+$invoices = Invoice::query()->whereRbac('billing.invoice.show', $user)->get();   // for another user
+```
+
 The scope becomes SQL. Combined grants are unioned, and a direct deny is applied as `NOT (…)`.
+
+### Frontends (Inertia, SPA)
+
+Send the user's permissions to the frontend to show or hide actions:
+
+```php
+// app/Http/Middleware/HandleInertiaRequests.php
+public function share(Request $request): array
+{
+    return [
+        ...parent::share($request),
+        'can' => $request->user()?->rbacPermissions() ?? [],
+    ];
+}
+```
+
+`rbacPermissions()` (or `Rbac::permissionsOf($user)`) lists every permission the user may use, with the widest scope they hold it at:
+
+```php
+['billing.invoice.show' => 'team', 'billing.invoice.edit' => 'own', 'reports.sales.export' => 'tenant']
+```
+
+It follows the same rule as a check without a record: only a global deny removes a permission. Use it for display only; every request is still checked on the server.
 
 ### Console commands
 
@@ -759,9 +803,7 @@ Rbac::flush();
 - [x] Separate RBAC database connection, `Unrestricted` scopes, `--guard` on commands (v1.8.2)
 - [x] `rbac:prune-expired`, coding standards and static analysis (v1.8.3)
 - [x] Tested on SQLite, MySQL, MariaDB and PostgreSQL, with and without the grant cache (v1.8.4)
-- [ ] A `Decision` enum alongside the `'allow'` / `'deny'` / `'none'` strings
-- [ ] A `whereRbac()` query scope on resource models
-- [ ] A user's effective permissions as a list, for SPA and Inertia frontends
+- [x] A `Decision` enum, a `whereRbac()` query scope, and a user's effective permissions for frontends (v1.9.0)
 
 Ideas and pull requests are welcome.
 

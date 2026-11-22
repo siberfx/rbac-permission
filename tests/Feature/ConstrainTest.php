@@ -98,3 +98,22 @@ test('a scoped deny does not hide rows whose scope column is null', function () 
         ->and($ids)->not->toContain($this->mine->id)
         ->and($ids)->not->toContain($this->teamMate->id);
 });
+
+test('whereRbac() on the model narrows the query like constrain()', function () {
+    Rbac::grant('manager', 'billing.invoice.show@team');
+    $this->jane->assignRole('manager');
+
+    $viaScope = Invoice::query()->whereRbac('billing.invoice.show', $this->jane)->orderBy('id')->pluck('id')->all();
+    $viaService = Rbac::constrain(Invoice::query(), 'billing.invoice.show', $this->jane)->orderBy('id')->pluck('id')->all();
+
+    expect($viaScope)->toBe($viaService)
+        ->and($viaScope)->toBe([$this->mine->id, $this->teamMate->id]);
+});
+
+test('whereRbac() uses the signed-in user when none is given', function () {
+    Rbac::grant('staff', 'billing.invoice.show@own');
+    $this->jane->assignRole('staff');
+    $this->actingAs($this->jane);
+
+    expect(Invoice::query()->whereRbac('billing.invoice.show')->pluck('id')->all())->toBe([$this->mine->id]);
+});

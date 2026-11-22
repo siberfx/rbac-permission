@@ -4,6 +4,22 @@ All notable changes to `siberfx/rbac-permission` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.9.0] - 2026-11-22
+
+### Added
+
+- `Siberfx\RbacPermission\Enums\Decision` (`Allow`, `Deny`, `None`, with `allowed()` and `denied()`) and `Rbac::decision()`, which returns it. `Rbac::decide()` still returns the string, and `Rbac::ALLOW`, `DENY` and `NONE` now take their values from the enum.
+- `whereRbac()` query scope on models that use `HasRbacScopes`: `Invoice::query()->whereRbac('billing.invoice.show')`, the same filter as `Rbac::constrain()`. It uses the signed-in user unless you pass one.
+- `Rbac::permissionsOf($user)` and `HasRbac::rbacPermissions()`: every permission the user may use, with the widest scope they hold it at, e.g. `['billing.invoice.show' => 'team']`. Meant for showing or hiding actions in Inertia or SPA frontends. See "Frontends" in the README.
+
+### Changed
+
+- Minimum Laravel 12 version is now 12.4 (`illuminate/*: ^12.4 || ^13.0`). The query scope uses Eloquent's `#[Scope]` attribute, which arrived in 12.4.0. Laravel 13 is unchanged.
+
+### Upgrading
+
+- On Laravel 12.0 to 12.3, update to 12.4 or later first (`composer update laravel/framework`).
+
 ## [1.8.4] - 2026-11-22
 
 ### Added

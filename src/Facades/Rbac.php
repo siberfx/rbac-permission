@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Facades\Facade;
+use Siberfx\RbacPermission\Enums\Decision;
 use Siberfx\RbacPermission\Models\Role;
 use Siberfx\RbacPermission\Models\RoleGrant;
 use Siberfx\RbacPermission\Models\UserGrant;
@@ -20,7 +21,9 @@ use Siberfx\RbacPermission\Support\Catalog;
  * @method static bool allows(string $permission, mixed $subject = null, ?Model $user = null)
  * @method static bool denies(string $permission, mixed $subject = null, ?Model $user = null)
  * @method static void enforce(string $permission, mixed $subject = null, ?Model $user = null)
+ * @method static Decision decision(string $permission, mixed $subject = null, ?Model $user = null)
  * @method static string decide(string $permission, mixed $subject = null, ?Model $user = null)
+ * @method static array<string, string> permissionsOf(?Model $user = null)
  * @method static array<string, mixed> explain(string $permission, mixed $subject = null, ?Model $user = null)
  * @method static ?bool gate(string $ability, mixed $user, array<array-key, mixed> $arguments = [])
  * @method static ?string widestScope(string $permission, ?Model $user = null)

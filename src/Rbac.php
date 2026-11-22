@@ -16,6 +16,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Siberfx\RbacPermission\Enums\Decision;
 use Siberfx\RbacPermission\Events\RbacChanged;
 use Siberfx\RbacPermission\Exceptions\InvalidPermission;
 use Siberfx\RbacPermission\Exceptions\PermissionDenied;
@@ -32,11 +33,12 @@ use Siberfx\RbacPermission\Support\PermissionKey;
 
 final class Rbac
 {
-    public const string ALLOW = 'allow';
+    // The string forms of Decision, kept for decide() and existing callers.
+    public const string ALLOW = Decision::Allow->value;
 
-    public const string DENY = 'deny';
+    public const string DENY = Decision::Deny->value;
 
-    public const string NONE = 'none';
+    public const string NONE = Decision::None->value;
 
     /** @var array<string, list<Grant>> */
     private array $memo = [];
@@ -70,7 +72,7 @@ final class Rbac
 
     public function allows(string $permission, mixed $subject = null, ?Model $user = null): bool
     {
-        return $this->decide($permission, $subject, $user) === self::ALLOW;
+        return $this->decision($permission, $subject, $user)->allowed();
     }
 
     public function denies(string $permission, mixed $subject = null, ?Model $user = null): bool
@@ -88,16 +90,16 @@ final class Rbac
     }
 
     /**
-     * Returns ALLOW, DENY or NONE. A matching deny always beats an allow.
+     * Allow, Deny or None. A matching deny always beats an allow.
      */
-    public function decide(string $permission, mixed $subject = null, ?Model $user = null): string
+    public function decision(string $permission, mixed $subject = null, ?Model $user = null): Decision
     {
         $this->assertKnown($permission);
 
         $user ??= $this->currentUser();
 
         if ($user === null) {
-            return self::NONE;
+            return Decision::None;
         }
 
         $subject = $this->asSubject($subject);
@@ -105,17 +107,53 @@ final class Rbac
 
         foreach ($matching as $grant) {
             if ($grant->effect === Grant::DENY && $this->covers($grant, $user, $subject)) {
-                return self::DENY;
+                return Decision::Deny;
             }
         }
 
         foreach ($matching as $grant) {
             if ($grant->effect === Grant::ALLOW && $this->covers($grant, $user, $subject)) {
-                return self::ALLOW;
+                return Decision::Allow;
             }
         }
 
-        return self::NONE;
+        return Decision::None;
+    }
+
+    /**
+     * The same as decision(), as a string: 'allow', 'deny' or 'none' (Rbac::ALLOW, DENY, NONE).
+     */
+    public function decide(string $permission, mixed $subject = null, ?Model $user = null): string
+    {
+        return $this->decision($permission, $subject, $user)->value;
+    }
+
+    /**
+     * Every catalog permission the user may use, with the widest scope they hold it at,
+     * e.g. ['billing.invoice.show' => 'team']. Decided as allows() without a record, so
+     * only a global deny removes a permission. Handy for hiding buttons in a frontend.
+     *
+     * @return array<string, string>
+     */
+    public function permissionsOf(?Model $user = null): array
+    {
+        $user ??= $this->currentUser();
+
+        if ($user === null) {
+            return [];
+        }
+
+        $permissions = [];
+
+        foreach ($this->catalog->permissions() as $permission) {
+            $scope = $this->decision($permission, null, $user)->allowed() ? $this->widestScope($permission, $user) : null;
+
+            if ($scope !== null) {
+                $permissions[$permission] = $scope;
+            }
+        }
+
+        return $permissions;
     }
 
     /**
@@ -132,10 +170,10 @@ final class Rbac
 
         $subject = $arguments[0] ?? null;
 
-        return match ($this->decide($ability, $subject instanceof Model ? $subject : null, $user)) {
-            self::ALLOW => true,
-            self::DENY => false,
-            default => null,
+        return match ($this->decision($ability, $subject instanceof Model ? $subject : null, $user)) {
+            Decision::Allow => true,
+            Decision::Deny => false,
+            Decision::None => null,
         };
     }
 

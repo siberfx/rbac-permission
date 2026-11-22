@@ -74,6 +74,17 @@ trait HasRbac
     }
 
     /**
+     * Every permission this user may use, with its widest scope, e.g. ['billing.invoice.show' => 'team'].
+     * Share it with a frontend to show or hide actions; the server still checks every request.
+     *
+     * @return array<string, string>
+     */
+    public function rbacPermissions(): array
+    {
+        return app(Rbac::class)->permissionsOf($this);
+    }
+
+    /**
      * Team ids used by the "team" scope. Override, or point rbac.user.teams_relation at your relation.
      *
      * @return list<int|string>
