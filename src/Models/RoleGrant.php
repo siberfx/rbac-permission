@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class RoleGrant extends Model
 {
+    // Not #[Fillable]: that attribute is Laravel 13 only, and Laravel 12 would silently ignore it.
     protected $fillable = ['role_id', 'permission', 'scope'];
 
     protected function casts(): array

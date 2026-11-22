@@ -20,6 +20,7 @@ use Illuminate\Support\Carbon;
  */
 class UserGrant extends Model
 {
+    // Not #[Fillable]: that attribute is Laravel 13 only, and Laravel 12 would silently ignore it.
     protected $fillable = ['model_type', 'model_id', 'permission', 'scope', 'effect', 'expires_at'];
 
     protected function casts(): array

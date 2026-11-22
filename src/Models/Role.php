@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Role extends Model
 {
+    // Not #[Fillable]: that attribute is Laravel 13 only, and Laravel 12 would silently ignore it.
     protected $fillable = ['slug', 'guard', 'name', 'description', 'rank'];
 
     protected function casts(): array

@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Siberfx\RbacPermission;
 
+use DateTimeInterface;
 use Illuminate\Contracts\Cache\Factory as CacheFactory;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
-use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -13,9 +15,9 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Siberfx\RbacPermission\Events\RbacChanged;
 use Siberfx\RbacPermission\Exceptions\InvalidPermission;
 use Siberfx\RbacPermission\Exceptions\PermissionDenied;
-use Siberfx\RbacPermission\Events\RbacChanged;
 use Siberfx\RbacPermission\Exceptions\RoleAssignmentDenied;
 use Siberfx\RbacPermission\Models\Role;
 use Siberfx\RbacPermission\Models\RoleGrant;
