@@ -16,7 +16,7 @@
                     <td>{{ $role->slug }}</td>
                     <td>{{ $role->pivot->expires_at ?? 'never' }}</td>
                     <td style="text-align:right">
-                        <form method="POST" action="{{ route('rbac.users.roles.destroy', [$user->getKey(), $role->slug]) }}" class="inline">
+                        <form method="POST" action="{{ route('rbac.users.roles.destroy', [$user->getKey(), $role->slug, 'guard' => $guard]) }}" class="inline">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="danger">Remove</button>
@@ -29,7 +29,7 @@
         </tbody>
     </table>
 
-    <form method="POST" action="{{ route('rbac.users.roles.store', $user->getKey()) }}" class="toolbar">
+    <form method="POST" action="{{ route('rbac.users.roles.store', [$user->getKey(), 'guard' => $guard]) }}" class="toolbar">
         @csrf
         <select name="role" required>
             @foreach ($available as $role)

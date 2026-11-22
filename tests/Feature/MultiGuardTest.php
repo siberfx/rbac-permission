@@ -80,3 +80,39 @@ test('rbac:matrix can show the roles of one guard', function () {
         ->expectsOutputToContain('auditor')
         ->assertExitCode(0);
 });
+
+test('the user model is resolved from the guard', function () {
+    expect(Rbac::userModel())->toBe(\Siberfx\RbacPermission\Tests\Fixtures\User::class)
+        ->and(Rbac::userModel('admin'))->toBe(Admin::class);
+});
+
+test('rbac:assign and rbac:explain accept --guard for its user model', function () {
+    $admin = Admin::create(['name' => 'Admin auditor']);
+
+    $this->artisan('rbac:assign', ['role' => 'auditor', 'user' => $admin->getKey(), '--guard' => 'admin'])->assertSuccessful();
+
+    expect($admin->refresh()->hasRole('auditor'))->toBeTrue();
+
+    $this->artisan('rbac:explain', ['permission' => 'reports.sales.export', 'user' => $admin->getKey(), '--guard' => 'admin'])
+        ->expectsOutputToContain('ALLOW')
+        ->assertSuccessful();
+});
+
+test('the admin user page manages users of another guard', function () {
+    $actor = $this->makeUser(['name' => 'Root']);
+    Rbac::assign($actor, 'super-admin');
+    Role::query()->where('slug', 'super-admin')->update(['rank' => 100]);
+    $admin = Admin::create(['name' => 'Admin auditor']);
+
+    $this->actingAs($actor)->get("/rbac/users/{$admin->getKey()}?guard=admin")
+        ->assertOk()
+        ->assertSee('(admin)', false);
+
+    $this->actingAs($actor)->post("/rbac/users/{$admin->getKey()}/roles?guard=admin", ['role' => 'auditor'])->assertRedirect();
+
+    expect($admin->refresh()->hasRole('auditor'))->toBeTrue();
+
+    $this->actingAs($actor)->delete("/rbac/users/{$admin->getKey()}/roles/auditor?guard=admin")->assertRedirect();
+
+    expect($admin->refresh()->hasRole('auditor'))->toBeFalse();
+});

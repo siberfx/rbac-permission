@@ -135,3 +135,26 @@ class RegionScopeFixture implements \Siberfx\RbacPermission\Scopes\ScopeContract
         $query->where($model->qualifyColumn('amount'), '<', 1000);
     }
 }
+
+describe('an unrestricted scope under another name', function () {
+    beforeEach(function () {
+        Rbac::scopes()->register('everywhere', \Siberfx\RbacPermission\Tests\Fixtures\EverywhereScope::class, 100);
+        $this->user = $this->makeUser(['name' => 'Jane']);
+        $this->invoice = $this->makeInvoice(['user_id' => 999, 'team_id' => 99, 'tenant_id' => 9]);
+    });
+
+    test('its deny hides list pages and every row', function () {
+        Rbac::allow($this->user, 'billing.invoice.show@own');
+        Rbac::deny($this->user, 'billing.invoice.show@everywhere');
+
+        expect(Rbac::decide('billing.invoice.show', null, $this->user))->toBe('deny')
+            ->and(Rbac::constrain(\Siberfx\RbacPermission\Tests\Fixtures\Invoice::query(), 'billing.invoice.show', $this->user)->count())->toBe(0);
+    });
+
+    test('its allow reaches every row without a filter', function () {
+        Rbac::allow($this->user, 'billing.invoice.show@everywhere');
+
+        expect(Rbac::constrain(\Siberfx\RbacPermission\Tests\Fixtures\Invoice::query(), 'billing.invoice.show', $this->user)->count())
+            ->toBe(\Siberfx\RbacPermission\Tests\Fixtures\Invoice::query()->count());
+    });
+});

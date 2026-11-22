@@ -26,6 +26,23 @@ return new class extends Migration
         'add_guard_to_rbac_roles',
     ];
 
+    /** The app's default connection, where its migrations table lives. */
+    private ?string $appConnection;
+
+    public function __construct()
+    {
+        // Captured on load: while this migration runs, the migrator makes rbac.connection the default.
+        $this->appConnection = DB::getDefaultConnection();
+    }
+
+    /**
+     * The tables go on rbac.connection, or the default connection.
+     */
+    public function getConnection(): ?string
+    {
+        return config('rbac.connection') ?? $this->connection;
+    }
+
     public function up(): void
     {
         $this->roles();
@@ -197,11 +214,13 @@ return new class extends Migration
         $repository = config('database.migrations');
         $repository = is_array($repository) ? ($repository['table'] ?? 'migrations') : ($repository ?? 'migrations');
 
-        if (! Schema::hasTable($repository)) {
+        $connection = DB::connection($this->appConnection);
+
+        if (! $connection->getSchemaBuilder()->hasTable($repository)) {
             return false;
         }
 
-        return DB::table($repository)
+        return $connection->table($repository)
             ->where(function ($query) {
                 foreach (self::LEGACY as $name) {
                     // Published as "<name>" or "<date>_<name>".

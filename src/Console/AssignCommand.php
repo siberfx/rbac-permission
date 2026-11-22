@@ -12,7 +12,8 @@ class AssignCommand extends Command
     protected $signature = 'rbac:assign
         {role : Role slug}
         {user : User id}
-        {--model= : User model class (defaults to the auth users model)}
+        {--model= : User model class (defaults to the model of the guard)}
+        {--guard= : Guard whose user model to use (defaults to the default guard)}
         {--revoke : Remove the role instead of assigning it}
         {--expires= : When the role stops applying, e.g. "+30 days" or "2027-01-31"}';
 
@@ -20,7 +21,7 @@ class AssignCommand extends Command
 
     public function handle(Rbac $rbac): int
     {
-        $userClass = $this->option('model') ?: config('auth.providers.users.model');
+        $userClass = $this->option('model') ?: $rbac->userModel($this->option('guard') ?: null);
         $user = $userClass::query()->find($this->argument('user'));
 
         if ($user === null) {

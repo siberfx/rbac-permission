@@ -188,6 +188,8 @@ Scopes answer *where*. Each one is a small class with two jobs: decide whether a
 
 Add your own scope, such as `region`, in three steps: write a class that implements `ScopeContract`, register it under `rbac.scopes` with a `level`, and use it in a grant. A `level` decides which scope counts as "widest" in matrices and reports.
 
+If your scope reaches every record, like `global`, mark it with the `Unrestricted` interface. Its allow then adds no row filter, and its deny also hides list pages. This works whatever you name the scope.
+
 If your scope reads a column that can be NULL, also implement `ExcludesRows`. Its `exclude()` method tells `Rbac::constrain()` how to drop the scope's rows when a deny applies, without also dropping rows where the column is NULL. Without it, a deny is applied as `NOT (...)`, which drops those rows too.
 
 ---
@@ -355,6 +357,8 @@ Every action checks a catalog permission:
 
 The user permissions are checked against the user being managed, so a grant like `admin.user.edit@tenant` only reaches users in the actor's tenant.
 
+A user's page is at `/rbac/users/{id}`. For a user of another guard, add `?guard=`, e.g. `/rbac/users/5?guard=admin`. The guard must be listed in `rbac.guards`.
+
 A role editor can only add a grant they already hold at that scope or wider, and are not denied, enforced by `Rbac::canGrant()`. They can only change roles ranked below their own (`Rbac::canEditRole()`), so a role editor needs a rank in `rbac.ranks`. Role assignment follows the rank rules, so an admin cannot hand out a role at their own rank or higher.
 
 The screens are plain Blade with no CDN assets, and they follow light and dark mode. They are a starting point. To change the look, publish the views with `php artisan vendor:publish --tag=rbac-views`. They are then loaded from `resources/views/vendor/rbac`.
@@ -466,8 +470,10 @@ The admin user is the one signed in on the Backpack guard (`backpack_auth()`).
 | --- | --- |
 | `rbac:sync [--prune] [--guard=]` | Writes the roles from `config/rbac.php` to the database in one transaction, for every guard (or only `--guard`). `--prune` removes roles that are no longer defined. |
 | `rbac:matrix [--only-granted] [--guard=]` | Prints the role by permission grid for one guard, showing the widest scope of each grant. |
-| `rbac:explain {permission} {user} [--on-model= --on=]` | Explains a decision, with the grants that were considered. |
-| `rbac:assign {role} {user} [--revoke] [--expires=]` | Gives or removes a role for a user. `--expires` makes the role time-boxed. |
+| `rbac:explain {permission} {user} [--on-model= --on=] [--guard=]` | Explains a decision, with the grants that were considered. |
+| `rbac:assign {role} {user} [--revoke] [--expires=] [--guard=]` | Gives or removes a role for a user. `--expires` makes the role time-boxed. |
+
+`--guard` picks the user model from that guard's auth provider, e.g. `--guard=admin` for your `Admin` model. `--model=` still overrides it.
 | `rbac:grant {role} {permission} [--revoke] [--guard=]` | Adds or removes a grant on a role. The role is created if it is missing. |
 
 ```bash
@@ -620,6 +626,7 @@ php artisan vendor:publish --tag=rbac-config
 | Key | Purpose |
 | --- | --- |
 | `tables` | Table names, if they clash with yours |
+| `connection` | Database connection for every RBAC table (`RBAC_DB_CONNECTION`). `null` uses the default connection |
 | `default_scope` | Scope used when a grant has no `@scope`. Default: `own` |
 | `verbs` | The allowed verb vocabulary |
 | `modules` | The catalog of every permission in your application |
@@ -627,7 +634,7 @@ php artisan vendor:publish --tag=rbac-config
 | `columns` | Default owner, team and tenant columns on resource models |
 | `user.teams_relation` | Relation on the user that returns teams |
 | `roles` | Roles as code, applied with `rbac:sync` |
-| `console` | Console actor and unattended policy |
+| `console` | Console actor (`user_id`, the `guard` its model belongs to, or a `resolver`) and unattended policy |
 | `cache` | Optional cross-request grant cache (`ttl` in seconds, `0` disables) |
 | `register_gate` | Whether catalog permissions are registered with the Gate |
 

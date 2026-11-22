@@ -10,7 +10,8 @@ class ExplainCommand extends Command
     protected $signature = 'rbac:explain
         {permission : Permission key, e.g. billing.invoice.edit}
         {user : User id}
-        {--model= : User model class (defaults to the auth users model)}
+        {--model= : User model class (defaults to the model of the guard)}
+        {--guard= : Guard whose user model to use (defaults to the default guard)}
         {--on-model= : Subject model class, e.g. App\\Models\\Invoice}
         {--on= : Subject id}';
 
@@ -18,7 +19,7 @@ class ExplainCommand extends Command
 
     public function handle(Rbac $rbac): int
     {
-        $userClass = $this->option('model') ?: config('auth.providers.users.model');
+        $userClass = $this->option('model') ?: $rbac->userModel($this->option('guard') ?: null);
         $user = $userClass::query()->find($this->argument('user'));
 
         if ($user === null) {

@@ -91,3 +91,25 @@ test('every change dispatches RbacChanged, even when audit is off', function () 
         && $event->subject?->is($user)
         && $event->details['permission'] === 'billing.refund.approve');
 });
+
+test('assigning a role the user already holds changes nothing', function () {
+    config(['rbac.audit.enabled' => true]);
+    Rbac::role('staff');
+    $user = $this->makeUser(['name' => 'Jane']);
+
+    Rbac::assign($user, 'staff');
+    $created = DB::table('rbac_role_assignments')->value('created_at');
+
+    $this->travel(1)->hours();
+    Rbac::assign($user, 'staff');
+
+    expect(DB::table('rbac_audit_logs')->where('action', 'role.assigned')->count())->toBe(1)
+        ->and(DB::table('rbac_role_assignments')->value('created_at'))->toBe($created);
+
+    // A new expiry is a change: recorded, and the assignment keeps its creation time.
+    Rbac::assign($user, 'staff', null, now()->addDay());
+
+    expect(DB::table('rbac_audit_logs')->where('action', 'role.assigned')->count())->toBe(2)
+        ->and(DB::table('rbac_role_assignments')->value('created_at'))->toBe($created)
+        ->and(DB::table('rbac_role_assignments')->value('expires_at'))->not->toBeNull();
+});

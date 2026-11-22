@@ -4,6 +4,23 @@ All notable changes to `siberfx/rbac-permission` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.8.2] - 2026-11-22
+
+### Fixed
+
+- RBAC queries used different database connections: assignments went through the user model's connection, `pruneExpired()`, `sync()` and the audit log through the default connection, and the models through their own. Everything now uses one connection.
+- The `global` scope was recognised by its name. Renaming it, or adding another top scope, silently lost its "no row filter" and "deny hides list pages" behaviour. Scopes that reach every record are now recognised by the new `Unrestricted` interface, which `GlobalScope` implements.
+- Assigning a role the user already holds, with the same expiry, no longer rewrites the row or records a second `role.assigned` audit entry. Changing the expiry keeps the assignment's original `created_at`.
+- The admin user pages, `rbac:assign`, `rbac:explain` and the console actor only knew `auth.providers.users.model`, so users of another guard could not be managed. They now resolve the user model from the guard's auth provider.
+
+### Added
+
+- `rbac.connection` (`RBAC_DB_CONNECTION`): the database connection for every RBAC table. The migration creates the tables on it. `null`, the default, keeps the default connection.
+- `Siberfx\RbacPermission\Scopes\Unrestricted`: marker interface for custom scopes that reach every record.
+- `Rbac::userModel(?string $guard)`: the user model of a guard.
+- `--guard` on `rbac:assign` and `rbac:explain`, `?guard=` on the admin user pages, and `rbac.console.guard` for the console actor.
+- The `Rbac` facade docblock now lists every public method and its current signature.
+
 ## [1.8.1] - 2026-11-22
 
 ### Changed

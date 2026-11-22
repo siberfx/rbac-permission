@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * "global": every record. Adds no constraint to queries.
  */
-final class GlobalScope implements ScopeContract
+final class GlobalScope implements ScopeContract, Unrestricted
 {
     public function covers(Model $user, Model $subject): bool
     {

@@ -3,6 +3,7 @@
 namespace Siberfx\RbacPermission;
 
 use Illuminate\Contracts\Cache\Factory as CacheFactory;
+use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
@@ -20,6 +21,7 @@ use Siberfx\RbacPermission\Models\RoleGrant;
 use Siberfx\RbacPermission\Models\UserGrant;
 use Siberfx\RbacPermission\Scopes\ExcludesRows;
 use Siberfx\RbacPermission\Scopes\ScopeRegistry;
+use Siberfx\RbacPermission\Scopes\Unrestricted;
 use Siberfx\RbacPermission\Support\Catalog;
 use Siberfx\RbacPermission\Support\Grant;
 use Siberfx\RbacPermission\Support\PermissionKey;
@@ -256,7 +258,7 @@ final class Rbac
         ));
 
         foreach ($grants as $grant) {
-            if ($grant->effect === Grant::DENY && $grant->scope === 'global') {
+            if ($grant->effect === Grant::DENY && $this->isUnrestricted($grant->scope)) {
                 return $query->whereRaw('1 = 0');
             }
         }
@@ -267,7 +269,7 @@ final class Rbac
             return $query->whereRaw('1 = 0');
         }
 
-        $hasGlobal = array_any($allows, fn (Grant $grant) => $grant->scope === 'global');
+        $hasGlobal = array_any($allows, fn (Grant $grant) => $this->isUnrestricted($grant->scope));
 
         if (! $hasGlobal) {
             $query->where(function ($q) use ($allows, $user, $model) {
@@ -320,7 +322,7 @@ final class Rbac
      */
     public function rankOf(Model $user): ?int
     {
-        $rank = $this->whereActive($user->getConnection()->table($this->table('role_assignments').' as a')
+        $rank = $this->whereActive($this->db()->table($this->table('role_assignments').' as a')
             ->join($this->table('roles').' as r', 'r.id', '=', 'a.role_id')
             ->where('a.model_type', $user->getMorphClass())
             ->where('a.model_id', (string) $user->getKey())
@@ -395,11 +397,19 @@ final class Rbac
         $role = $role instanceof Role ? $role : $this->findRole($role, $this->guardFor($user));
         $this->assertCanManage($by, $role);
 
-        // Re-assigning replaces the expiry: no date makes the role permanent again.
-        $user->getConnection()->table($this->table('role_assignments'))->updateOrInsert(
-            ['role_id' => $role->getKey(), 'model_type' => $user->getMorphClass(), 'model_id' => (string) $user->getKey()],
-            ['expires_at' => $expiresAt, 'created_at' => now(), 'updated_at' => now()],
-        );
+        $table = $this->db()->table($this->table('role_assignments'));
+        $key = ['role_id' => $role->getKey(), 'model_type' => $user->getMorphClass(), 'model_id' => (string) $user->getKey()];
+        $existing = (clone $table)->where($key)->first(['expires_at']);
+
+        if ($existing === null) {
+            $table->insert([...$key, 'expires_at' => $expiresAt, 'created_at' => now(), 'updated_at' => now()]);
+        } elseif ($this->timestamp($existing->expires_at) === $expiresAt?->getTimestamp()) {
+            // Already held with the same expiry: nothing to write or record.
+            return;
+        } else {
+            // Re-assigning replaces the expiry: no date makes the role permanent again.
+            $table->where($key)->update(['expires_at' => $expiresAt, 'updated_at' => now()]);
+        }
 
         $this->flush();
 
@@ -411,7 +421,7 @@ final class Rbac
         $role = $role instanceof Role ? $role : $this->findRole($role, $this->guardFor($user));
         $this->assertCanManage($by, $role);
 
-        $deleted = $user->getConnection()->table($this->table('role_assignments'))
+        $deleted = $this->db()->table($this->table('role_assignments'))
             ->where('role_id', $role->getKey())
             ->where('model_type', $user->getMorphClass())
             ->where('model_id', (string) $user->getKey())
@@ -447,7 +457,7 @@ final class Rbac
      */
     public function pruneExpired(): int
     {
-        $connection = DB::connection();
+        $connection = $this->db();
 
         $assignments = $connection->table($this->table('role_assignments'))
             ->whereNotNull('expires_at')->where('expires_at', '<=', now())->delete();
@@ -505,7 +515,7 @@ final class Rbac
             $parsed[(string) $slug] = array_map(fn ($spec) => $this->parseGrant((string) $spec), (array) $specs);
         }
 
-        return DB::transaction(function () use ($parsed, $prune, $guard) {
+        return $this->db()->transaction(function () use ($parsed, $prune, $guard) {
             $stats = ['roles' => 0, 'grants' => 0, 'added' => 0, 'removed' => 0, 'pruned' => 0];
 
             $ranks = (array) $this->guardSetting($guard, 'ranks');
@@ -549,7 +559,7 @@ final class Rbac
             if ($prune) {
                 foreach (Role::query()->where('guard', $guard)->whereNotIn('slug', array_keys($parsed))->get() as $role) {
                     RoleGrant::query()->where('role_id', $role->getKey())->delete();
-                    DB::table($this->table('role_assignments'))->where('role_id', $role->getKey())->delete();
+                    $this->db()->table($this->table('role_assignments'))->where('role_id', $role->getKey())->delete();
                     $role->delete();
                     $stats['pruned']++;
                 }
@@ -618,9 +628,24 @@ final class Rbac
             return null;
         }
 
-        $class = config('auth.providers.users.model');
+        $class = $this->userModel(config('rbac.console.guard'));
 
         return $class::query()->find($id);
+    }
+
+    /**
+     * The user model a guard authenticates, read from its auth provider.
+     * Defaults to the default guard; falls back to auth.providers.users.model.
+     *
+     * @return class-string<Model>
+     */
+    public function userModel(?string $guard = null): string
+    {
+        $guard ??= $this->defaultGuard();
+        $provider = config("auth.guards.{$guard}.provider");
+        $model = $provider ? config("auth.providers.{$provider}.model") : null;
+
+        return (string) ($model ?? config('auth.providers.users.model'));
     }
 
     /**
@@ -635,7 +660,7 @@ final class Rbac
         $this->forgetMemo();
 
         if ((int) config('rbac.cache.ttl', 0) > 0) {
-            DB::afterCommit(function (): void {
+            $this->db()->afterCommit(function (): void {
                 $this->forgetMemo();
                 $this->store()->forever('rbac.version', Str::random(12));
             });
@@ -672,6 +697,14 @@ final class Rbac
         return array_values(array_filter($grants, fn (Grant $grant) => $grant->isActive($now)));
     }
 
+    /**
+     * Does the scope reach every record? True for "global" and any scope marked Unrestricted.
+     */
+    private function isUnrestricted(string $scope): bool
+    {
+        return $this->scopes->get($scope) instanceof Unrestricted;
+    }
+
     private function forgetMemo(): void
     {
         $this->memo = [];
@@ -694,7 +727,7 @@ final class Rbac
         }
 
         if ($subject === null) {
-            return $grant->effect === Grant::ALLOW || $grant->scope === 'global';
+            return $grant->effect === Grant::ALLOW || $scope instanceof Unrestricted;
         }
 
         return $scope->covers($user, $subject);
@@ -725,7 +758,7 @@ final class Rbac
      */
     private function loadGrants(Model $user): array
     {
-        $connection = $user->getConnection();
+        $connection = $this->db();
         $morph = $user->getMorphClass();
         $id = (string) $user->getKey();
 
@@ -905,6 +938,14 @@ final class Rbac
     private function store()
     {
         return $this->cache->store(config('rbac.cache.store'));
+    }
+
+    /**
+     * The connection for every RBAC table: rbac.connection, or the default connection.
+     */
+    private function db(): Connection
+    {
+        return DB::connection(config('rbac.connection'));
     }
 
     private function table(string $key): string

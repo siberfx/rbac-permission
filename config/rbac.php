@@ -41,6 +41,15 @@ return [
 
     /*
     |----------------------------------------------------------------------
+    | Database connection
+    |----------------------------------------------------------------------
+    | Connection for every RBAC table. null uses the default connection. Set
+    | it before running the migration; the tables are created on it.
+    */
+    'connection' => env('RBAC_DB_CONNECTION'),
+
+    /*
+    |----------------------------------------------------------------------
     | Default scope
     |----------------------------------------------------------------------
     | Used when a grant is written without "@scope". Least privilege by default.
@@ -226,6 +235,7 @@ return [
     */
     'console' => [
         'user_id' => env('RBAC_CONSOLE_USER_ID'),
+        'guard' => null,          // guard whose user model user_id belongs to; null = default guard
         'resolver' => null,
         'allow_unattended' => false,
     ],

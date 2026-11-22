@@ -25,7 +25,7 @@ class WriteAuditLog
             $details['expires_at'] = $expiresAt->format('Y-m-d H:i:s');
         }
 
-        DB::table(config('rbac.tables.audit_logs', 'rbac_audit_logs'))->insert([
+        DB::connection(config('rbac.connection'))->table(config('rbac.tables.audit_logs', 'rbac_audit_logs'))->insert([
             'action' => $event->action,
             'actor_type' => $event->actor?->getMorphClass(),
             'actor_id' => $event->actor ? (string) $event->actor->getKey() : null,

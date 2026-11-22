@@ -80,13 +80,14 @@ final class RbacAdminController extends Controller
 
     public function user(Request $request, int|string $id): View
     {
-        $user = $this->userModel()::query()->findOrFail($id);
+        $user = $this->userModel($request)::query()->findOrFail($id);
 
         // The user is the subject, so a tenant or team grant only reaches users in that tenant or team.
         $this->authorizeAction($request, 'admin.user.show', $user);
 
         return view('rbac::users.show', [
             'user' => $user,
+            'guard' => $this->guard($request),
             'assigned' => $user->roles()->orderBy('slug')->get(),
             'available' => Role::query()->where('guard', $user->rbacGuard())->orderByDesc('rank')->orderBy('slug')->get(),
         ]);
@@ -94,7 +95,7 @@ final class RbacAdminController extends Controller
 
     public function assign(Request $request, int|string $id): RedirectResponse
     {
-        $user = $this->userModel()::query()->findOrFail($id);
+        $user = $this->userModel($request)::query()->findOrFail($id);
         $actor = $this->authorizeAction($request, 'admin.user.edit', $user);
 
         $data = $request->validate([
@@ -118,7 +119,7 @@ final class RbacAdminController extends Controller
 
     public function unassign(Request $request, int|string $id, string $slug): RedirectResponse
     {
-        $user = $this->userModel()::query()->findOrFail($id);
+        $user = $this->userModel($request)::query()->findOrFail($id);
         $actor = $this->authorizeAction($request, 'admin.user.edit', $user);
 
         try {
@@ -189,10 +190,12 @@ final class RbacAdminController extends Controller
     }
 
     /**
+     * The user model of the guard in ?guard= (one of the configured guards), or of the default guard.
+     *
      * @return class-string<Model>
      */
-    private function userModel(): string
+    private function userModel(Request $request): string
     {
-        return (string) config('auth.providers.users.model');
+        return $this->rbac->userModel($this->guard($request));
     }
 }
