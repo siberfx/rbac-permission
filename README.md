@@ -106,6 +106,8 @@ php artisan vendor:publish --tag=rbac-migrations
 php artisan migrate
 ```
 
+The whole schema is in one migration, `create_rbac_permission_tables`. It checks every table and column before changing anything. When you upgrade, you can publish and migrate again: on an app that already has the RBAC tables, it adds only what is missing. Rolling it back never drops tables that older RBAC migrations created.
+
 **3. Add the trait to your user model**
 
 ```php
@@ -185,6 +187,8 @@ Scopes answer *where*. Each one is a small class with two jobs: decide whether a
 | `global` | always | nothing |
 
 Add your own scope, such as `region`, in three steps: write a class that implements `ScopeContract`, register it under `rbac.scopes` with a `level`, and use it in a grant. A `level` decides which scope counts as "widest" in matrices and reports.
+
+If your scope reads a column that can be NULL, also implement `ExcludesRows`. Its `exclude()` method tells `Rbac::constrain()` how to drop the scope's rows when a deny applies, without also dropping rows where the column is NULL. Without it, a deny is applied as `NOT (...)`, which drops those rows too.
 
 ---
 
@@ -349,7 +353,9 @@ Every action checks a catalog permission:
 | `admin.user.show` | View a user's roles |
 | `admin.user.edit` | Assign or remove a user's roles |
 
-A role editor can only add a grant they already hold at that scope or wider, enforced by `Rbac::canGrant()`. Role assignment follows the rank rules, so an admin cannot hand out a role at their own rank or higher.
+The user permissions are checked against the user being managed, so a grant like `admin.user.edit@tenant` only reaches users in the actor's tenant.
+
+A role editor can only add a grant they already hold at that scope or wider, and are not denied, enforced by `Rbac::canGrant()`. They can only change roles ranked below their own (`Rbac::canEditRole()`), so a role editor needs a rank in `rbac.ranks`. Role assignment follows the rank rules, so an admin cannot hand out a role at their own rank or higher.
 
 The screens are plain Blade with no CDN assets, and they follow light and dark mode. They are a starting point. To change the look, publish the views with `php artisan vendor:publish --tag=rbac-views`. They are then loaded from `resources/views/vendor/rbac`.
 
@@ -568,7 +574,7 @@ php artisan rbac:assign staff 42 --expires="+7 days"
 
 Expired rows are ignored at once, even if they are still in the table. Assigning a role again without an expiry makes it permanent.
 
-When the grant cache is enabled (`rbac.cache.ttl > 0`), a grant can keep applying for up to `ttl` seconds after it expires. Keep the TTL short if that matters to you.
+This also holds with the grant cache enabled (`rbac.cache.ttl > 0`): each cached grant carries its expiry and stops applying on time.
 
 ### Audit log
 

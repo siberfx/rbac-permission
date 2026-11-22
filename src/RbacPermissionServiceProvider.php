@@ -21,6 +21,16 @@ use Siberfx\RbacPermission\Support\Catalog;
 
 class RbacPermissionServiceProvider extends ServiceProvider
 {
+    /**
+     * The package migrations, in the order they must run. A later schema change goes
+     * in a new file added at the end, and checks its table or column before acting.
+     *
+     * @var list<string>
+     */
+    public const MIGRATIONS = [
+        'create_rbac_permission_tables',
+    ];
+
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/rbac.php', 'rbac');
@@ -32,7 +42,9 @@ class RbacPermissionServiceProvider extends ServiceProvider
 
         $this->app->singleton(ScopeRegistry::class, fn () => new ScopeRegistry(config('rbac.scopes', [])));
 
-        $this->app->singleton(Rbac::class, fn ($app) => new Rbac(
+        // Scoped, not singleton: Octane and queue workers start each request or job
+        // with a fresh instance, so memoised grants never outlive their lifecycle.
+        $this->app->scoped(Rbac::class, fn ($app) => new Rbac(
             $app->make(Catalog::class),
             $app->make(ScopeRegistry::class),
             $app['cache'],
@@ -86,8 +98,34 @@ class RbacPermissionServiceProvider extends ServiceProvider
             __DIR__.'/../resources/views' => resource_path('views/vendor/rbac'),
         ], 'rbac-views');
 
-        $this->publishesMigrations([
-            __DIR__.'/../database/migrations' => database_path('migrations'),
-        ], 'rbac-migrations');
+        $this->publishesMigrations($this->migrationPublishPaths(), 'rbac-migrations');
+    }
+
+    /**
+     * Source file => destination, in the order the migrations must run.
+     *
+     * Laravel runs migrations sorted by file name and the source files have no date
+     * prefix, so each file gets an ascending date prefix here. A migration the app
+     * has already published, with or without a prefix, keeps its path and is skipped.
+     *
+     * @return array<string, string>
+     */
+    private function migrationPublishPaths(): array
+    {
+        $paths = [];
+        $now = time();
+
+        foreach (self::MIGRATIONS as $i => $name) {
+            $existing = glob(database_path("migrations/*{$name}.php")) ?: [];
+            $existing = array_values(array_filter(
+                $existing,
+                fn (string $path) => preg_match('/^(\d{4}_\d{2}_\d{2}_\d{6}_)?'.preg_quote($name, '/').'\.php$/', basename($path)) === 1,
+            ));
+
+            $paths[__DIR__."/../database/migrations/{$name}.php"] = $existing[0]
+                ?? database_path('migrations/'.date('Y_m_d_His', $now + $i)."_{$name}.php");
+        }
+
+        return $paths;
     }
 }

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -17,6 +18,7 @@ use Siberfx\RbacPermission\Exceptions\RoleAssignmentDenied;
 use Siberfx\RbacPermission\Models\Role;
 use Siberfx\RbacPermission\Models\RoleGrant;
 use Siberfx\RbacPermission\Models\UserGrant;
+use Siberfx\RbacPermission\Scopes\ExcludesRows;
 use Siberfx\RbacPermission\Scopes\ScopeRegistry;
 use Siberfx\RbacPermission\Support\Catalog;
 use Siberfx\RbacPermission\Support\Grant;
@@ -162,8 +164,8 @@ final class Rbac
 
     /**
      * May this actor put this permission on a role? They must hold every matching
-     * permission at a scope at least as wide. This stops a role editor from
-     * handing out permissions they do not have themselves.
+     * permission at a scope at least as wide, and must not be denied any of them.
+     * This stops a role editor from handing out permissions they do not have themselves.
      */
     public function canGrant(Model $actor, string $input): bool
     {
@@ -179,6 +181,11 @@ final class Rbac
         }
 
         foreach ($keys as $key) {
+            // A deny on the key, at any scope, means the actor may not hand it out.
+            if (array_any($this->matching($actor, $key), fn (Grant $grant) => $grant->effect === Grant::DENY)) {
+                return false;
+            }
+
             $widest = $this->widestScope($key, $actor);
 
             if ($widest === null || $this->scopes->level($widest) < $this->scopes->level($scope)) {
@@ -264,8 +271,19 @@ final class Rbac
         }
 
         foreach ($grants as $grant) {
-            if ($grant->effect === Grant::DENY) {
-                $query->whereNot(fn ($q) => $this->scopes->get($grant->scope)->constrain($q, $user, $model));
+            if ($grant->effect !== Grant::DENY) {
+                continue;
+            }
+
+            $scope = $this->scopes->get($grant->scope);
+
+            // A plain NOT (...) also drops rows whose scope column is NULL, which
+            // covers() does not treat as denied. Scopes that know their columns
+            // exclude rows null-safely.
+            if ($scope instanceof ExcludesRows) {
+                $query->where(fn ($q) => $scope->exclude($q, $user, $model));
+            } else {
+                $query->whereNot(fn ($q) => $scope->constrain($q, $user, $model));
             }
         }
 
@@ -584,14 +602,31 @@ final class Rbac
 
     /**
      * Forget memoised grants. Called automatically by every write method.
+     *
+     * Inside a transaction the cache version is bumped only once it commits.
+     * Bumping earlier would let another request load the old rows and cache
+     * them under the new version. A rollback leaves the cache alone.
      */
     public function flush(): void
     {
         $this->memo = [];
 
         if ((int) config('rbac.cache.ttl', 0) > 0) {
-            $this->store()->forever('rbac.version', Str::random(12));
+            DB::afterCommit(function (): void {
+                $this->memo = [];
+                $this->store()->forever('rbac.version', Str::random(12));
+            });
         }
+    }
+
+    /**
+     * May this actor change the grants of this role? Same rule as canAssign():
+     * only roles strictly below the actor's own rank, so nobody edits their own
+     * role or one above it.
+     */
+    public function canEditRole(Model $actor, Role $role): bool
+    {
+        return $this->canAssign($actor, $role);
     }
 
     /* ------------------------------------------------------------------
@@ -603,9 +638,11 @@ final class Rbac
      */
     private function matching(Model $user, string $permission): array
     {
+        $now = now()->getTimestamp();
+
         return array_values(array_filter(
             $this->grantsFor($user),
-            fn (Grant $grant) => PermissionKey::matches($grant->permission, $permission),
+            fn (Grant $grant) => $grant->isActive($now) && PermissionKey::matches($grant->permission, $permission),
         ));
     }
 
@@ -666,24 +703,30 @@ final class Rbac
             ->where('a.model_type', $morph)
             ->where('a.model_id', $id)
             ->where('r.guard', $this->guardFor($user)), 'a.expires_at')
-            ->get(['r.slug as role', 'g.permission', 'g.scope']);
+            ->get(['r.slug as role', 'g.permission', 'g.scope', 'a.expires_at']);
 
         $direct = $this->whereActive($connection->table($this->table('user_grants'))
             ->where('model_type', $morph)
             ->where('model_id', $id), 'expires_at')
-            ->get(['permission', 'scope', 'effect']);
+            ->get(['permission', 'scope', 'effect', 'expires_at']);
 
         $grants = [];
 
+        // The expiry travels with each grant, so a cached list still drops it on time.
         foreach ($fromRoles as $row) {
-            $grants[] = new Grant($row->permission, $row->scope, Grant::ALLOW, 'role:'.$row->role);
+            $grants[] = new Grant($row->permission, $row->scope, Grant::ALLOW, 'role:'.$row->role, $this->timestamp($row->expires_at));
         }
 
         foreach ($direct as $row) {
-            $grants[] = new Grant($row->permission, $row->scope, $row->effect, 'direct');
+            $grants[] = new Grant($row->permission, $row->scope, $row->effect, 'direct', $this->timestamp($row->expires_at));
         }
 
         return $grants;
+    }
+
+    private function timestamp(mixed $value): ?int
+    {
+        return $value === null ? null : Carbon::parse($value)->getTimestamp();
     }
 
     private function directGrant(Model $user, string $input, string $effect, ?DateTimeInterface $expiresAt = null): UserGrant
@@ -818,7 +861,8 @@ final class Rbac
 
     private function cacheKey(Model $user): string
     {
-        return 'rbac.grants.'.$this->cacheVersion().'.'.$this->memoKey($user);
+        // "v2": Grant gained expiresAt in 1.8.0, so entries cached by older versions are not reused.
+        return 'rbac.grants.v2.'.$this->cacheVersion().'.'.$this->memoKey($user);
     }
 
     private function cacheVersion(): string

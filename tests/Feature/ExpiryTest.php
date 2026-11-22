@@ -74,3 +74,21 @@ test('rbac:assign accepts an --expires option', function () {
     expect($user->refresh()->roles->first()->pivot->expires_at)->not->toBeNull()
         ->and(Rbac::allows('billing.invoice.show', null, $user))->toBeTrue();
 });
+
+test('an expired grant stops applying while the grant cache is on', function () {
+    config(['rbac.cache.ttl' => 3600, 'rbac.cache.store' => 'array']);
+    $user = $this->makeUser(['name' => 'Jane']);
+    Rbac::allow($user, 'billing.invoice.edit@own', Carbon::now()->addMinute());
+    Rbac::assign($user, 'staff', null, Carbon::now()->addMinute());
+
+    expect(Rbac::allows('billing.invoice.edit', null, $user))->toBeTrue()
+        ->and(Rbac::allows('billing.invoice.show', null, $user))->toBeTrue();
+
+    $this->travel(5)->minutes();
+    // A new request: the per-request memo is gone, only the cache remains.
+    app()->forgetScopedInstances();
+    Rbac::clearResolvedInstances();
+
+    expect(Rbac::allows('billing.invoice.edit', null, $user))->toBeFalse()
+        ->and(Rbac::allows('billing.invoice.show', null, $user))->toBeFalse();
+});

@@ -78,11 +78,10 @@ abstract class TestCase extends Orchestra
             $table->unsignedInteger('amount')->default(0);
         });
 
-        (require __DIR__.'/../database/migrations/create_rbac_tables.php')->up();
-        (require __DIR__.'/../database/migrations/add_rank_to_rbac_roles.php')->up();
-        (require __DIR__.'/../database/migrations/add_expires_at_to_rbac_grants.php')->up();
-        (require __DIR__.'/../database/migrations/create_rbac_audit_logs_table.php')->up();
-        (require __DIR__.'/../database/migrations/add_guard_to_rbac_roles.php')->up();
+        // The same order the provider publishes them in.
+        foreach (RbacPermissionServiceProvider::MIGRATIONS as $migration) {
+            (require __DIR__."/../database/migrations/{$migration}.php")->up();
+        }
     }
 
     protected function defineRoutes($router): void

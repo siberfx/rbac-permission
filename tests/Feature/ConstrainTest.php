@@ -79,3 +79,20 @@ test('a global grant returns every row unfiltered', function () {
 
     expect(Rbac::constrain(Invoice::query(), 'billing.invoice.show', $this->jane)->count())->toBe(4);
 });
+
+test('a scoped deny does not hide rows whose scope column is null', function () {
+    $orphan = $this->makeInvoice(['user_id' => null, 'team_id' => null, 'tenant_id' => 1]);
+    Rbac::grant('admin', 'billing.invoice.show@tenant');
+    $this->jane->assignRole('admin');
+    Rbac::deny($this->jane, 'billing.invoice.show@team');
+    Rbac::deny($this->jane, 'billing.invoice.show@own');
+
+    $ids = Rbac::constrain(Invoice::query(), 'billing.invoice.show', $this->jane)->pluck('id')->all();
+
+    // The list and the single-record check must agree.
+    expect(Rbac::allows('billing.invoice.show', $orphan, $this->jane))->toBeTrue()
+        ->and($ids)->toContain($orphan->id)
+        ->and($ids)->toContain($this->olasTeam->id)
+        ->and($ids)->not->toContain($this->mine->id)
+        ->and($ids)->not->toContain($this->teamMate->id);
+});

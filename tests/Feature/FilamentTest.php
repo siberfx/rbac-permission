@@ -16,6 +16,8 @@ beforeEach(function () {
 
     Rbac::sync(config('rbac.roles'));
     Rbac::sync(['role-editor' => ['admin.role.show@global', 'admin.role.edit@global', 'billing.invoice.show@team']]);
+    // Grants can only be changed on roles below the editor's rank (staff is 10).
+    Role::query()->where('slug', 'role-editor')->update(['rank' => 60]);
 });
 
 test('the plugin adds the role resource to a panel', function () {
@@ -117,4 +119,28 @@ test('assigning a role from the user screen follows the rank rules', function ()
     Operations::unassignRole($admin, $target, 'manager');
 
     expect($target->refresh()->hasRole('manager'))->toBeFalse();
+});
+
+test('the user roles screen is limited to users the actor reaches', function () {
+    $admin = $this->makeUser(['name' => 'Admin', 'tenant_id' => 1]);
+    Rbac::assign($admin, 'admin');
+    $outsider = \Siberfx\RbacPermission\Tests\Fixtures\User::create(['name' => 'Outsider', 'tenant_id' => 2]);
+
+    $this->actingAs($admin);
+
+    expect(\Siberfx\RbacPermission\Filament\Resources\UserRolesRelationManager::canViewForRecord($outsider, 'x'))->toBeFalse()
+        ->and(fn () => Operations::assignRole($admin, $outsider, 'manager'))->toThrow(PermissionDenied::class)
+        ->and(fn () => Operations::unassignRole($admin, $outsider, 'manager'))->toThrow(PermissionDenied::class)
+        ->and($outsider->refresh()->hasRole('manager'))->toBeFalse();
+});
+
+test('grant operations are limited to roles below the actor\'s rank', function () {
+    $admin = $this->makeUser(['name' => 'Admin']);
+    Rbac::assign($admin, 'admin');
+    $adminRole = Role::query()->where('slug', 'admin')->firstOrFail();
+    $grant = $adminRole->grants()->where('permission', 'billing.*')->firstOrFail();
+
+    expect(fn () => Operations::grant($admin, $adminRole, 'billing.invoice.show', 'team'))->toThrow(PermissionDenied::class)
+        ->and(fn () => Operations::revoke($admin, $adminRole, $grant))->toThrow(PermissionDenied::class)
+        ->and($adminRole->grants()->whereKey($grant->getKey())->exists())->toBeTrue();
 });

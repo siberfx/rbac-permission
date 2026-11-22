@@ -21,7 +21,8 @@ use Siberfx\RbacPermission\Rbac;
 final class Operations
 {
     /**
-     * Add a grant to a role. The actor must hold the permission at that scope or wider.
+     * Add a grant to a role. The role must be below the actor's rank, and the actor
+     * must hold the permission at that scope or wider.
      *
      * @throws ValidationException
      */
@@ -29,6 +30,7 @@ final class Operations
     {
         $input = "{$permission}@{$scope}";
 
+        self::assertCanEditRole($actor, $role);
         self::assertCanGrant($actor, $input);
 
         try {
@@ -43,6 +45,7 @@ final class Operations
      */
     public static function revoke(Model $actor, Role $role, RoleGrant $grant): void
     {
+        self::assertCanEditRole($actor, $role);
         self::assertCanGrant($actor, "{$grant->permission}@{$grant->scope}");
 
         app(Rbac::class)->revoke($role, "{$grant->permission}@{$grant->scope}");
@@ -50,11 +53,14 @@ final class Operations
 
     /**
      * Assign a role to a user, held to the rank rules. $expiresAt is optional.
+     * The actor needs admin.user.edit reaching this user (e.g. the same tenant).
      *
      * @throws ValidationException
      */
     public static function assignRole(Model $actor, Model $user, string $slug, ?Carbon $expiresAt = null): void
     {
+        app(Rbac::class)->enforce('admin.user.edit', $user, $actor);
+
         try {
             app(Rbac::class)->assign($user, $slug, $actor, $expiresAt);
         } catch (RoleAssignmentDenied|InvalidArgumentException $e) {
@@ -63,10 +69,12 @@ final class Operations
     }
 
     /**
-     * Remove a role from a user, held to the rank rules.
+     * Remove a role from a user, held to the rank rules and admin.user.edit like assignRole().
      */
     public static function unassignRole(Model $actor, Model $user, string $slug): void
     {
+        app(Rbac::class)->enforce('admin.user.edit', $user, $actor);
+
         try {
             app(Rbac::class)->unassign($user, $slug, $actor);
         } catch (RoleAssignmentDenied|InvalidArgumentException $e) {
@@ -89,6 +97,13 @@ final class Operations
 
         $role->update(['rank' => $rank]);
         app(Rbac::class)->flush();
+    }
+
+    private static function assertCanEditRole(Model $actor, Role $role): void
+    {
+        if (! app(Rbac::class)->canEditRole($actor, $role)) {
+            throw new PermissionDenied('admin.role.edit', 'none', "You may not change [{$role->slug}]: it is not below your rank.");
+        }
     }
 
     private static function assertCanGrant(Model $actor, string $input): void

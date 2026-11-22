@@ -49,6 +49,7 @@ final class RbacAdminController extends Controller
         $actor = $this->authorizeAction($request, 'admin.role.edit');
         $permission = $this->permissionInput($request);
 
+        $this->assertCanEditRole($actor, $role);
         $this->assertCanGrant($actor, $permission);
 
         try {
@@ -65,6 +66,7 @@ final class RbacAdminController extends Controller
         $actor = $this->authorizeAction($request, 'admin.role.edit');
         $permission = $this->permissionInput($request);
 
+        $this->assertCanEditRole($actor, $role);
         $this->assertCanGrant($actor, $permission);
 
         try {
@@ -78,9 +80,10 @@ final class RbacAdminController extends Controller
 
     public function user(Request $request, int|string $id): View
     {
-        $this->authorizeAction($request, 'admin.user.show');
-
         $user = $this->userModel()::query()->findOrFail($id);
+
+        // The user is the subject, so a tenant or team grant only reaches users in that tenant or team.
+        $this->authorizeAction($request, 'admin.user.show', $user);
 
         return view('rbac::users.show', [
             'user' => $user,
@@ -91,8 +94,8 @@ final class RbacAdminController extends Controller
 
     public function assign(Request $request, int|string $id): RedirectResponse
     {
-        $actor = $this->authorizeAction($request, 'admin.user.edit');
         $user = $this->userModel()::query()->findOrFail($id);
+        $actor = $this->authorizeAction($request, 'admin.user.edit', $user);
 
         $data = $request->validate([
             'role' => ['required', 'string', 'max:64'],
@@ -115,8 +118,8 @@ final class RbacAdminController extends Controller
 
     public function unassign(Request $request, int|string $id, string $slug): RedirectResponse
     {
-        $actor = $this->authorizeAction($request, 'admin.user.edit');
         $user = $this->userModel()::query()->findOrFail($id);
+        $actor = $this->authorizeAction($request, 'admin.user.edit', $user);
 
         try {
             $this->rbac->unassign($user, $slug, $actor);
@@ -129,8 +132,9 @@ final class RbacAdminController extends Controller
 
     /**
      * Checks the permission for the signed-in user and returns them.
+     * Pass the record being acted on, so the grant's scope is checked against it.
      */
-    private function authorizeAction(Request $request, string $permission): Model
+    private function authorizeAction(Request $request, string $permission, ?Model $subject = null): Model
     {
         $actor = $request->user();
 
@@ -138,9 +142,16 @@ final class RbacAdminController extends Controller
             throw new AuthenticationException;
         }
 
-        $this->rbac->enforce($permission, null, $actor);
+        $this->rbac->enforce($permission, $subject, $actor);
 
         return $actor;
+    }
+
+    private function assertCanEditRole(Model $actor, Role $role): void
+    {
+        if (! $this->rbac->canEditRole($actor, $role)) {
+            throw new PermissionDenied('admin.role.edit', 'none', "You may not change [{$role->slug}]: it is not below your rank.");
+        }
     }
 
     private function assertCanGrant(Model $actor, string $permission): void

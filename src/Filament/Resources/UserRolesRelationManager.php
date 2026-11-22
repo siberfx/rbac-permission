@@ -35,7 +35,7 @@ class UserRolesRelationManager extends RelationManager
 
     public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
     {
-        return static::rbacAllows('admin.user.show');
+        return static::rbacAllows('admin.user.show', $ownerRecord);
     }
 
     public function table(Table $table): Table
@@ -49,7 +49,7 @@ class UserRolesRelationManager extends RelationManager
             ->headerActions([
                 CreateAction::make()
                     ->label('Assign role')
-                    ->visible(fn (): bool => static::rbacAllows('admin.user.edit'))
+                    ->visible(fn (): bool => static::rbacAllows('admin.user.edit', $this->getOwnerRecord()))
                     ->form([
                         Select::make('role')
                             ->label('Role')
@@ -80,7 +80,7 @@ class UserRolesRelationManager extends RelationManager
                     ->label('Remove')
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->visible(fn (): bool => static::rbacAllows('admin.user.edit'))
+                    ->visible(fn (): bool => static::rbacAllows('admin.user.edit', $this->getOwnerRecord()))
                     ->action(fn (Role $record) => Operations::unassignRole(
                         static::requireRbacActor(),
                         $this->getOwnerRecord(),

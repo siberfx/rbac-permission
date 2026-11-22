@@ -4,6 +4,40 @@ All notable changes to `siberfx/rbac-permission` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.8.0] - 2026-11-22
+
+### Security
+
+- Admin screens: viewing a user and assigning or removing their roles now checks `admin.user.show` / `admin.user.edit` against that user. Before, a tenant- or team-scoped admin could manage users of any tenant or team.
+- Filament: the user roles relation manager and `Operations::assignRole()` / `unassignRole()` apply the same check. Both operations now throw `PermissionDenied` when the actor does not reach the user.
+- Changing a role's grants now follows the rank rules, like assigning a role. An actor can only add or remove grants on roles strictly below their own rank, so nobody can edit their own role or one above it. This applies to the Blade admin screens and to Filament `Operations::grant()` / `revoke()`. Before, it was enforced only by the Filament edit page.
+- `Rbac::canGrant()` now refuses a permission the actor is denied at any scope, even when a role also allows it to them.
+
+### Fixed
+
+- `php artisan migrate` failed on a fresh install. The published migrations had no date prefix, so they ran in alphabetical order and `add_*` ran before `create_rbac_tables`. The five migrations are now merged into one, `create_rbac_permission_tables`, published with a date prefix. Publishing again does not create a duplicate.
+- Stale permissions in long-running processes. `Rbac` is now bound as `scoped` instead of `singleton`, so Octane workers and `queue:work` start every request or job with fresh grants. Before, a change made in another process was not seen until the worker restarted.
+- With the grant cache on (`rbac.cache.ttl > 0`), a role assignment or direct grant kept working after its `expires_at` until the cache entry expired. Each cached grant now carries its expiry and stops applying on time. Cache keys changed (`rbac.grants.v2.*`), so entries cached by older versions are ignored.
+- The grant cache is invalidated after the surrounding database transaction commits, not before. Before, another request could load the old rows mid-transaction and cache them under the new version, which left stale permissions until the TTL ran out. A rolled-back change no longer invalidates the cache.
+- `Rbac::constrain()` hid rows whose owner, team or tenant column is NULL whenever the user had an `@own`, `@team` or `@tenant` deny, while `allows()` on the same row returned true. Denies on the built-in scopes now exclude only rows they actually cover.
+
+### Added
+
+- `Rbac::canEditRole($actor, $role)`: whether the actor may change the role's grants.
+- `Siberfx\RbacPermission\Scopes\ExcludesRows`: optional interface for custom scopes, to remove their rows NULL-safely when denied. Scopes without it keep the previous `NOT (...)` behaviour.
+- `Siberfx\RbacPermission\Support\Grant` gained `expiresAt` and `isActive()`.
+- `RbacPermissionServiceProvider::MIGRATIONS` lists the package migrations in run order. Future schema changes will be new guarded migrations added at the end.
+
+### Changed
+
+- One migration for the whole schema: `create_rbac_permission_tables` replaces `create_rbac_tables`, `add_rank_to_rbac_roles`, `add_expires_at_to_rbac_grants`, `create_rbac_audit_logs_table` and `add_guard_to_rbac_roles`. It checks every table and column first. On an app that already has the tables it adds only what is missing, such as `rank`, `guard` or `expires_at` from a partial upgrade, and running it twice does nothing. Its rollback does not drop tables when any of the older migrations is recorded in the app's migrations table.
+
+### Upgrading
+
+- Apps that already ran the older migrations need no action. Those migrations stay in your app and keep working. If you publish again, the new migration is added next to them, and running it is safe: it only adds what is missing.
+- Role editors need a rank above the roles they edit. A role-editor role that held only `admin.role.edit` and had rank 0 can no longer change any role's grants. Give it a rank in `rbac.ranks`, e.g. `'role-editor' => 60`, and run `php artisan rbac:sync`.
+- If you call `Operations::assignRole()` / `unassignRole()` yourself, the actor now needs `admin.user.edit` reaching the target user.
+
 ## [1.7.0] - 2026-11-16
 
 ### Added
